@@ -1,15 +1,16 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QSet>
 #include <QSortFilterProxyModel>
 #include <QTimer>
 #include <memory>
 
 #include "../core/IProcessProvider.h"
-#include "ProcessTableModel.h"
+#include "ProcessTreeModel.h"
 
 class QLineEdit;
-class QTableView;
+class QTreeView;
 class QLabel;
 
 namespace gui {
@@ -25,18 +26,24 @@ private slots:
     void showProcessContextMenu(const QPoint &pos);
     void terminateSelected();
     void setPrioritySelected(core::ProcessPriority priority);
+    void onRowExpanded(const QModelIndex &proxyIndex);
+    void onRowCollapsed(const QModelIndex &proxyIndex);
 
 private:
     void buildUi();
     void buildToolbar();
+    void restoreTreeState();
 
     std::unique_ptr<core::IProcessProvider> provider_;
-    ProcessTableModel *model_;
+    ProcessTreeModel *model_;
     QSortFilterProxyModel *proxyModel_;
-    QTableView *tableView_;
+    QTreeView *treeView_;
     QLineEdit *searchBox_;
     QLabel *statusLabel_;
     QTimer refreshTimer_;
+
+    QSet<uint64_t> expandedPids_;
+    bool autoExpandDone_ = false;
 };
 
 } // namespace gui

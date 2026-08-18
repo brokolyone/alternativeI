@@ -2,13 +2,15 @@
 
 #include <QAction>
 #include <QHeaderView>
+#include <QItemSelection>
+#include <QItemSelectionModel>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
 #include <QStatusBar>
-#include <QTableView>
 #include <QToolBar>
+#include <QTreeView>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -35,31 +37,33 @@ void MainWindow::buildUi() {
     searchBox_->setPlaceholderText(QStringLiteral("Filter by name, PID or path..."));
     layout->addWidget(searchBox_);
 
-    model_ = new ProcessTableModel(this);
+    model_ = new ProcessTreeModel(this);
     proxyModel_ = new QSortFilterProxyModel(this);
     proxyModel_->setSourceModel(model_);
     proxyModel_->setFilterCaseSensitivity(Qt::CaseInsensitive);
     proxyModel_->setFilterKeyColumn(-1); // search across all columns
+    proxyModel_->setRecursiveFilteringEnabled(true);
 
     connect(searchBox_, &QLineEdit::textChanged, proxyModel_,
             &QSortFilterProxyModel::setFilterFixedString);
 
-    tableView_ = new QTableView(central);
-    tableView_->setModel(proxyModel_);
-    tableView_->setSelectionBehavior(QAbstractItemView::SelectRows);
-    tableView_->setSelectionMode(QAbstractItemView::ExtendedSelection);
-    tableView_->setSortingEnabled(true);
-    tableView_->setAlternatingRowColors(true);
-    tableView_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    tableView_->horizontalHeader()->setStretchLastSection(true);
-    tableView_->horizontalHeader()->setSectionResizeMode(ProcessTableModel::ColumnName,
-                                                           QHeaderView::Stretch);
-    tableView_->verticalHeader()->setVisible(false);
-    tableView_->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(tableView_, &QTableView::customContextMenuRequested, this,
+    treeView_ = new QTreeView(central);
+    treeView_->setModel(proxyModel_);
+    treeView_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    treeView_->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    treeView_->setSortingEnabled(true);
+    treeView_->setAlternatingRowColors(true);
+    treeView_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    treeView_->setUniformRowHeights(true);
+    treeView_->header()->setStretchLastSection(true);
+    treeView_->header()->setSectionResizeMode(ProcessTreeModel::ColumnName, QHeaderView::Stretch);
+    treeView_->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(treeView_, &QTreeView::customContextMenuRequested, this,
             &MainWindow::showProcessContextMenu);
+    connect(treeView_, &QTreeView::expanded, this, &MainWindow::onRowExpanded);
+    connect(treeView_, &QTreeView::collapsed, this, &MainWindow::onRowCollapsed);
 
-    layout->addWidget(tableView_);
+    layout->addWidget(treeView_);
     setCentralWidget(central);
 
     statusLabel_ = new QLabel(this);
@@ -78,14 +82,74 @@ void MainWindow::buildToolbar() {
 }
 
 void MainWindow::refresh() {
+    QSet<uint64_t> selectedPids;
+    if (treeView_->selectionModel()) {
+        const auto selectedRows = treeView_->selectionModel()->selectedRows();
+        for (const QModelIndex &proxyIndex : selectedRows) {
+            const QModelIndex sourceIndex = proxyModel_->mapToSource(proxyIndex);
+            if (const core::ProcessInfo *info = model_->processForIndex(sourceIndex)) {
+                selectedPids.insert(info->pid);
+            }
+        }
+    }
+
     auto processes = provider_->snapshot();
     const int count = static_cast<int>(processes.size());
     model_->setProcesses(std::move(processes));
     statusLabel_->setText(QStringLiteral("Processes: %1").arg(count));
+
+    if (!autoExpandDone_) {
+        treeView_->expandAll();
+        autoExpandDone_ = true;
+    } else {
+        restoreTreeState();
+    }
+
+    if (!selectedPids.isEmpty() && treeView_->selectionModel()) {
+        QItemSelection selection;
+        for (uint64_t pid : selectedPids) {
+            const QModelIndex sourceIndex = model_->indexForPid(pid);
+            if (!sourceIndex.isValid()) continue;
+            const QModelIndex proxyIndex = proxyModel_->mapFromSource(sourceIndex);
+            if (proxyIndex.isValid()) {
+                const QModelIndex lastColumn = proxyIndex.siblingAtColumn(ProcessTreeModel::ColumnCount - 1);
+                selection.select(proxyIndex, lastColumn);
+            }
+        }
+        if (!selection.isEmpty()) {
+            treeView_->selectionModel()->select(
+                selection, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+        }
+    }
+}
+
+void MainWindow::restoreTreeState() {
+    for (uint64_t pid : std::as_const(expandedPids_)) {
+        const QModelIndex sourceIndex = model_->indexForPid(pid);
+        if (!sourceIndex.isValid()) continue;
+        const QModelIndex proxyIndex = proxyModel_->mapFromSource(sourceIndex);
+        if (proxyIndex.isValid()) {
+            treeView_->setExpanded(proxyIndex, true);
+        }
+    }
+}
+
+void MainWindow::onRowExpanded(const QModelIndex &proxyIndex) {
+    const QModelIndex sourceIndex = proxyModel_->mapToSource(proxyIndex);
+    if (const core::ProcessInfo *info = model_->processForIndex(sourceIndex)) {
+        expandedPids_.insert(info->pid);
+    }
+}
+
+void MainWindow::onRowCollapsed(const QModelIndex &proxyIndex) {
+    const QModelIndex sourceIndex = proxyModel_->mapToSource(proxyIndex);
+    if (const core::ProcessInfo *info = model_->processForIndex(sourceIndex)) {
+        expandedPids_.remove(info->pid);
+    }
 }
 
 void MainWindow::showProcessContextMenu(const QPoint &pos) {
-    const QModelIndex index = tableView_->indexAt(pos);
+    const QModelIndex index = treeView_->indexAt(pos);
     if (!index.isValid()) {
         return;
     }
@@ -101,7 +165,7 @@ void MainWindow::showProcessContextMenu(const QPoint &pos) {
     QAction *belowNormalAction = priorityMenu->addAction(QStringLiteral("Below normal"));
     QAction *idleAction = priorityMenu->addAction(QStringLiteral("Idle"));
 
-    QAction *chosen = menu.exec(tableView_->viewport()->mapToGlobal(pos));
+    QAction *chosen = menu.exec(treeView_->viewport()->mapToGlobal(pos));
     if (chosen == terminateAction) {
         terminateSelected();
     } else if (chosen == realtimeAction) {
@@ -120,7 +184,7 @@ void MainWindow::showProcessContextMenu(const QPoint &pos) {
 }
 
 void MainWindow::terminateSelected() {
-    const QModelIndexList selected = tableView_->selectionModel()->selectedRows();
+    const QModelIndexList selected = treeView_->selectionModel()->selectedRows();
     if (selected.isEmpty()) {
         return;
     }
@@ -133,7 +197,7 @@ void MainWindow::terminateSelected() {
 
     for (const QModelIndex &proxyIndex : selected) {
         const QModelIndex sourceIndex = proxyModel_->mapToSource(proxyIndex);
-        if (const core::ProcessInfo *info = model_->processAt(sourceIndex.row())) {
+        if (const core::ProcessInfo *info = model_->processForIndex(sourceIndex)) {
             provider_->terminate(info->pid);
         }
     }
@@ -141,10 +205,10 @@ void MainWindow::terminateSelected() {
 }
 
 void MainWindow::setPrioritySelected(core::ProcessPriority priority) {
-    const QModelIndexList selected = tableView_->selectionModel()->selectedRows();
+    const QModelIndexList selected = treeView_->selectionModel()->selectedRows();
     for (const QModelIndex &proxyIndex : selected) {
         const QModelIndex sourceIndex = proxyModel_->mapToSource(proxyIndex);
-        if (const core::ProcessInfo *info = model_->processAt(sourceIndex.row())) {
+        if (const core::ProcessInfo *info = model_->processForIndex(sourceIndex)) {
             provider_->setPriority(info->pid, priority);
         }
     }

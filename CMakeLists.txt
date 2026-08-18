@@ -30,8 +30,8 @@ endif()
 set(GUI_SOURCES
     src/gui/MainWindow.h
     src/gui/MainWindow.cpp
-    src/gui/ProcessTableModel.h
-    src/gui/ProcessTableModel.cpp
+    src/gui/ProcessTreeModel.h
+    src/gui/ProcessTreeModel.cpp
 )
 
 add_executable(alternative_hacker
