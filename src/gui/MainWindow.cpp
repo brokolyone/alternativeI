@@ -9,11 +9,13 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QStatusBar>
+#include <QTabWidget>
 #include <QToolBar>
 #include <QTreeView>
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "PerformanceView.h"
 #include "ProcessDetailsDialog.h"
 
 namespace gui {
@@ -67,7 +69,11 @@ void MainWindow::buildUi() {
     connect(treeView_, &QTreeView::doubleClicked, this, &MainWindow::openPropertiesForIndex);
 
     layout->addWidget(treeView_);
-    setCentralWidget(central);
+
+    auto *tabs = new QTabWidget(this);
+    tabs->addTab(central, QStringLiteral("Processes"));
+    tabs->addTab(new PerformanceView(tabs), QStringLiteral("Performance"));
+    setCentralWidget(tabs);
 
     statusLabel_ = new QLabel(this);
     statusBar()->addWidget(statusLabel_);
