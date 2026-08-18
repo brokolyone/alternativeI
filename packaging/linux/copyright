@@ -1,0 +1,10 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: alternative-hacker
+Source: https://github.com/brokolyone/alternativeI
+
+Files: *
+Copyright: 2026 alternativeI project contributors
+License: NOASSERTION
+ No license has been formally selected for this project yet; all rights
+ are reserved by the copyright holder(s) pending that decision. See the
+ upstream repository (Source, above) for the current status.

@@ -1,0 +1,8 @@
+alternative-hacker (0.1.0-1) unstable; urgency=low
+
+  * Initial release: process tree view, per-process properties dialog
+    (threads/modules/memory/handles/environment/network), system
+    performance graphs, services manager tab, and the diskutil CLI for
+    SHA-256-verified MBR/GPT/disk backup and restore.
+
+ -- AlternativeI Project <unset@example.invalid>  Tue, 18 Aug 2026 12:00:00 +0000

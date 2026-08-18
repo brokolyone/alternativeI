@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Alternative Hacker
+Comment=Process manager and system monitor (Process Hacker analog)
+Exec=alternative_hacker
+Icon=utilities-system-monitor
+Terminal=false
+Categories=System;Monitor;
