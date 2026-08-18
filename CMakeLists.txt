@@ -17,6 +17,9 @@ set(CORE_SOURCES
     src/core/SystemStats.h
     src/core/ISystemMonitor.h
     src/core/SystemMonitorFactory.cpp
+    src/core/ServiceInfo.h
+    src/core/IServiceManager.h
+    src/core/ServiceManagerFactory.cpp
 )
 
 if(WIN32)
@@ -25,6 +28,8 @@ if(WIN32)
         src/core/windows/ProcessProviderWin.cpp
         src/core/windows/SystemMonitorWin.h
         src/core/windows/SystemMonitorWin.cpp
+        src/core/windows/ServiceManagerWin.h
+        src/core/windows/ServiceManagerWin.cpp
     )
 elseif(UNIX)
     list(APPEND CORE_SOURCES
@@ -32,6 +37,8 @@ elseif(UNIX)
         src/core/linux/ProcessProviderLinux.cpp
         src/core/linux/SystemMonitorLinux.h
         src/core/linux/SystemMonitorLinux.cpp
+        src/core/linux/ServiceManagerLinux.h
+        src/core/linux/ServiceManagerLinux.cpp
     )
 endif()
 
@@ -48,6 +55,10 @@ set(GUI_SOURCES
     src/gui/SparklineWidget.cpp
     src/gui/PerformanceView.h
     src/gui/PerformanceView.cpp
+    src/gui/ServicesTableModel.h
+    src/gui/ServicesTableModel.cpp
+    src/gui/ServicesView.h
+    src/gui/ServicesView.cpp
 )
 
 add_executable(alternative_hacker

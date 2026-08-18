@@ -17,6 +17,7 @@
 
 #include "PerformanceView.h"
 #include "ProcessDetailsDialog.h"
+#include "ServicesView.h"
 
 namespace gui {
 
@@ -73,6 +74,7 @@ void MainWindow::buildUi() {
     auto *tabs = new QTabWidget(this);
     tabs->addTab(central, QStringLiteral("Processes"));
     tabs->addTab(new PerformanceView(tabs), QStringLiteral("Performance"));
+    tabs->addTab(new ServicesView(tabs), QStringLiteral("Services"));
     setCentralWidget(tabs);
 
     statusLabel_ = new QLabel(this);
