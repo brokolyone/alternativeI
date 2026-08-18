@@ -69,6 +69,15 @@ jobs:
       - name: Build
         run: cmake --build build --target alternative_hacker diskutil
 
+      # windows-latest doesn't ship NSIS despite earlier docs suggesting
+      # otherwise (CPack's NSIS generator failed with "Cannot find NSIS
+      # compiler makensis"); Chocolatey is preinstalled on the runner, so
+      # use it rather than a third-party action for a two-line install.
+      - name: Install NSIS
+        run: |
+          choco install nsis -y
+          echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
+
       - name: Package NSIS installer
         working-directory: build
         run: cpack -G NSIS
