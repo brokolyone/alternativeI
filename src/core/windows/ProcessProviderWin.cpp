@@ -1,5 +1,10 @@
 #include "ProcessProviderWin.h"
 
+// windows.h pulls in the legacy winsock.h unless told not to, which then
+// conflicts (duplicate/incompatible struct and function declarations)
+// with winsock2.h-family headers like iphlpapi.h/ws2tcpip.h below.
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 
 #include <iphlpapi.h>
