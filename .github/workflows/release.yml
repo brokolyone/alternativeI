@@ -4,7 +4,12 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (created if it doesn't exist yet)"
+        required: false
+        default: "v0.1.0"
 
 jobs:
   build-linux-deb:
@@ -63,7 +68,6 @@ jobs:
   publish-release:
     needs: [build-linux-deb, build-windows-installer]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:
@@ -71,9 +75,15 @@ jobs:
         with:
           path: artifacts
 
+      # On a tag push, github.ref_name is already the tag (e.g. "v0.1.0").
+      # On workflow_dispatch there's no tag yet - action-gh-release creates
+      # one at the current commit from tag_name below, using this job's
+      # own GITHUB_TOKEN (permissions.contents: write above), which is a
+      # different credential path than a manual `git push` of a tag.
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
             artifacts/linux-deb/*.deb
             artifacts/windows-installer/*.exe
