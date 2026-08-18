@@ -5,15 +5,9 @@
 // with winsock2.h-family headers like iphlpapi.h/ws2tcpip.h below.
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
-// MIB_TCP6TABLE_OWNER_PID/MIB_UDP6TABLE_OWNER_PID (used for the IPv6
-// network-connections query below) are gated behind _WIN32_WINNT >=
-// Vista in the SDK headers; set it explicitly rather than rely on
-// whatever default the toolchain picks.
-#define _WIN32_WINNT 0x0602
 #include <windows.h>
 
 #include <iphlpapi.h>
-#include <iprtrmib.h> // declares MIB_TCP6TABLE_OWNER_PID/MIB_UDP6TABLE_OWNER_PID
 #include <psapi.h>
 #include <tlhelp32.h>
 #include <winternl.h>
@@ -97,6 +91,42 @@ std::string tcpStateToStringWin(DWORD state) {
         default: return "UNKNOWN";
     }
 }
+
+// Locally-declared mirrors of MIB_TCP6TABLE_OWNER_PID/MIB_UDP6TABLE_OWNER_PID
+// (documented, ABI-stable since Vista) rather than relying on the SDK to
+// expose them under those names - the toolchain used for CI builds
+// doesn't declare them via <iphlpapi.h> even with _WIN32_WINNT set high
+// enough, and chasing the exact header/macro combination that would
+// expose the SDK's own versions isn't worth it when the layout is public
+// and fixed. Named distinctly to avoid clashing with anything the SDK
+// does declare.
+typedef struct _LOCAL_MIB_TCP6ROW_OWNER_PID {
+    UCHAR ucLocalAddr[16];
+    DWORD dwLocalScopeId;
+    DWORD dwLocalPort;
+    UCHAR ucRemoteAddr[16];
+    DWORD dwRemoteScopeId;
+    DWORD dwRemotePort;
+    DWORD dwState;
+    DWORD dwOwningPid;
+} LOCAL_MIB_TCP6ROW_OWNER_PID;
+
+typedef struct _LOCAL_MIB_TCP6TABLE_OWNER_PID {
+    DWORD dwNumEntries;
+    LOCAL_MIB_TCP6ROW_OWNER_PID table[1];
+} LOCAL_MIB_TCP6TABLE_OWNER_PID;
+
+typedef struct _LOCAL_MIB_UDP6ROW_OWNER_PID {
+    UCHAR ucLocalAddr[16];
+    DWORD dwLocalScopeId;
+    DWORD dwLocalPort;
+    DWORD dwOwningPid;
+} LOCAL_MIB_UDP6ROW_OWNER_PID;
+
+typedef struct _LOCAL_MIB_UDP6TABLE_OWNER_PID {
+    DWORD dwNumEntries;
+    LOCAL_MIB_UDP6ROW_OWNER_PID table[1];
+} LOCAL_MIB_UDP6TABLE_OWNER_PID;
 
 std::string wideToUtf8(const std::wstring &wide) {
     if (wide.empty()) {
@@ -596,7 +626,7 @@ std::vector<NetworkConnectionInfo> ProcessProviderWin::networkConnections(uint64
         if (size > 0 &&
             GetExtendedTcpTable(buffer.data(), &size, FALSE, AF_INET6, TCP_TABLE_OWNER_PID_ALL, 0) ==
                 NO_ERROR) {
-            auto *table = reinterpret_cast<MIB_TCP6TABLE_OWNER_PID *>(buffer.data());
+            auto *table = reinterpret_cast<LOCAL_MIB_TCP6TABLE_OWNER_PID *>(buffer.data());
             for (DWORD i = 0; i < table->dwNumEntries; ++i) {
                 const auto &row = table->table[i];
                 if (row.dwOwningPid != targetPid) continue;
@@ -650,7 +680,7 @@ std::vector<NetworkConnectionInfo> ProcessProviderWin::networkConnections(uint64
         std::vector<unsigned char> buffer(size);
         if (size > 0 &&
             GetExtendedUdpTable(buffer.data(), &size, FALSE, AF_INET6, UDP_TABLE_OWNER_PID, 0) == NO_ERROR) {
-            auto *table = reinterpret_cast<MIB_UDP6TABLE_OWNER_PID *>(buffer.data());
+            auto *table = reinterpret_cast<LOCAL_MIB_UDP6TABLE_OWNER_PID *>(buffer.data());
             for (DWORD i = 0; i < table->dwNumEntries; ++i) {
                 const auto &row = table->table[i];
                 if (row.dwOwningPid != targetPid) continue;
