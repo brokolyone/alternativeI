@@ -49,15 +49,29 @@ jobs:
           version: "6.7.*"
           arch: win64_msvc2019_64
 
+      # cmake -G "Visual Studio 17 2022" relies on CMake's own vswhere-based
+      # instance scan, which failed to find VS on this image ("could not
+      # find any instance of Visual Studio") despite VS2022 being present -
+      # a known flaky spot. Using Ninja with cl.exe/link.exe put on PATH by
+      # msvc-dev-cmd sidesteps that detection entirely and is the more
+      # standard pattern for MSVC-in-CI anyway.
+      - name: Set up MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v4
+
       - name: Configure
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --config Release --target alternative_hacker diskutil
+        run: cmake --build build --target alternative_hacker diskutil
 
       - name: Package NSIS installer
         working-directory: build
-        run: cpack -G NSIS -C Release
+        run: cpack -G NSIS
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
