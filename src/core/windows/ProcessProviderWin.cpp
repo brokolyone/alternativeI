@@ -5,9 +5,15 @@
 // with winsock2.h-family headers like iphlpapi.h/ws2tcpip.h below.
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
+// MIB_TCP6TABLE_OWNER_PID/MIB_UDP6TABLE_OWNER_PID (used for the IPv6
+// network-connections query below) are gated behind _WIN32_WINNT >=
+// Vista in the SDK headers; set it explicitly rather than rely on
+// whatever default the toolchain picks.
+#define _WIN32_WINNT 0x0602
 #include <windows.h>
 
 #include <iphlpapi.h>
+#include <iprtrmib.h> // declares MIB_TCP6TABLE_OWNER_PID/MIB_UDP6TABLE_OWNER_PID
 #include <psapi.h>
 #include <tlhelp32.h>
 #include <winternl.h>
