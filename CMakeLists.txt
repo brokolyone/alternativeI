@@ -74,3 +74,22 @@ if(WIN32)
     target_link_libraries(alternative_hacker PRIVATE ntdll advapi32 psapi iphlpapi ws2_32 pdh)
     target_compile_definitions(alternative_hacker PRIVATE UNICODE _UNICODE)
 endif()
+
+# diskutil: standalone CLI for raw MBR/GPT/disk backup-restore. Kept free
+# of the Qt dependency so it builds (and can be shipped/audited) on its
+# own - see README's disk module warning before running it against a real
+# device.
+add_executable(diskutil
+    src/diskutil/main.cpp
+    src/diskutil/BlockDevice.h
+    src/diskutil/BlockDevice.cpp
+    src/diskutil/Partitioning.h
+    src/diskutil/Partitioning.cpp
+    src/diskutil/Sha256.h
+    src/diskutil/Sha256.cpp
+)
+target_include_directories(diskutil PRIVATE src)
+
+if(WIN32)
+    target_compile_definitions(diskutil PRIVATE UNICODE _UNICODE)
+endif()
