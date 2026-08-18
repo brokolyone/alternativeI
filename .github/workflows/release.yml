@@ -40,8 +40,24 @@ jobs:
 
   build-windows-installer:
     runs-on: windows-latest
+    # Safety net: a previous run's "Package NSIS installer" step hung
+    # indefinitely (still running 15+ minutes after Build finished in
+    # under 30s) with no way to pull logs from a still-running job to
+    # diagnose live. Bound the whole job so a repeat fails fast with a
+    # clear timeout instead of silently burning CI minutes.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      # Prime suspect for the hang above: Windows Defender's real-time
+      # scanner doing a full behavioral scan of the freshly-built .exe
+      # files (NSIS installer, and the app binaries it packages) - a
+      # well-documented source of multi-minute stalls on Windows CI
+      # runners that don't affect plain .obj compilation. Exclude the
+      # whole workspace before anything gets built or packaged.
+      - name: Exclude workspace from Windows Defender scanning
+        run: Add-MpPreference -ExclusionPath "${{ github.workspace }}"
+        shell: powershell
 
       - name: Install Qt6
         uses: jurplel/install-qt-action@v4
@@ -81,6 +97,7 @@ jobs:
       - name: Package NSIS installer
         working-directory: build
         run: cpack -G NSIS
+        timeout-minutes: 6
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
