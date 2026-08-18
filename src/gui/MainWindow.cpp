@@ -14,6 +14,8 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "ProcessDetailsDialog.h"
+
 namespace gui {
 
 MainWindow::MainWindow(QWidget *parent)
@@ -62,6 +64,7 @@ void MainWindow::buildUi() {
             &MainWindow::showProcessContextMenu);
     connect(treeView_, &QTreeView::expanded, this, &MainWindow::onRowExpanded);
     connect(treeView_, &QTreeView::collapsed, this, &MainWindow::onRowCollapsed);
+    connect(treeView_, &QTreeView::doubleClicked, this, &MainWindow::openPropertiesForIndex);
 
     layout->addWidget(treeView_);
     setCentralWidget(central);
@@ -76,6 +79,9 @@ void MainWindow::buildToolbar() {
 
     auto *refreshAction = toolbar->addAction(QStringLiteral("Refresh"));
     connect(refreshAction, &QAction::triggered, this, &MainWindow::refresh);
+
+    auto *propertiesAction = toolbar->addAction(QStringLiteral("Properties"));
+    connect(propertiesAction, &QAction::triggered, this, &MainWindow::openPropertiesForSelected);
 
     auto *terminateAction = toolbar->addAction(QStringLiteral("Terminate"));
     connect(terminateAction, &QAction::triggered, this, &MainWindow::terminateSelected);
@@ -155,6 +161,8 @@ void MainWindow::showProcessContextMenu(const QPoint &pos) {
     }
 
     QMenu menu(this);
+    QAction *propertiesAction = menu.addAction(QStringLiteral("Properties..."));
+    menu.addSeparator();
     QAction *terminateAction = menu.addAction(QStringLiteral("Terminate"));
 
     QMenu *priorityMenu = menu.addMenu(QStringLiteral("Priority"));
@@ -166,7 +174,9 @@ void MainWindow::showProcessContextMenu(const QPoint &pos) {
     QAction *idleAction = priorityMenu->addAction(QStringLiteral("Idle"));
 
     QAction *chosen = menu.exec(treeView_->viewport()->mapToGlobal(pos));
-    if (chosen == terminateAction) {
+    if (chosen == propertiesAction) {
+        openPropertiesForIndex(index);
+    } else if (chosen == terminateAction) {
         terminateSelected();
     } else if (chosen == realtimeAction) {
         setPrioritySelected(core::ProcessPriority::Realtime);
@@ -202,6 +212,29 @@ void MainWindow::terminateSelected() {
         }
     }
     refresh();
+}
+
+void MainWindow::openPropertiesForSelected() {
+    const QModelIndexList selected = treeView_->selectionModel()->selectedRows();
+    if (!selected.isEmpty()) {
+        openPropertiesForIndex(selected.first());
+    }
+}
+
+void MainWindow::openPropertiesForIndex(const QModelIndex &proxyIndex) {
+    if (!proxyIndex.isValid()) {
+        return;
+    }
+    const QModelIndex sourceIndex = proxyModel_->mapToSource(proxyIndex);
+    const core::ProcessInfo *info = model_->processForIndex(sourceIndex);
+    if (info == nullptr) {
+        return;
+    }
+
+    auto *dialog = new ProcessDetailsDialog(provider_.get(), info->pid,
+                                             QString::fromStdString(info->name), this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->show();
 }
 
 void MainWindow::setPrioritySelected(core::ProcessPriority priority) {

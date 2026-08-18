@@ -28,6 +28,8 @@ private slots:
     void setPrioritySelected(core::ProcessPriority priority);
     void onRowExpanded(const QModelIndex &proxyIndex);
     void onRowCollapsed(const QModelIndex &proxyIndex);
+    void openPropertiesForSelected();
+    void openPropertiesForIndex(const QModelIndex &proxyIndex);
 
 private:
     void buildUi();

@@ -2,15 +2,90 @@
 
 #include <windows.h>
 
+#include <iphlpapi.h>
 #include <psapi.h>
 #include <tlhelp32.h>
+#include <winternl.h>
+#include <ws2tcpip.h>
 
 #include <array>
+#include <cstring>
 #include <cwchar>
+#include <vector>
 
 namespace core {
 
 namespace {
+
+// --- NtQuerySystemInformation(SystemHandleInformation) ---------------------
+// Undocumented but stable since XP; this is the same technique Process
+// Hacker itself uses for user-mode handle enumeration. Not declared in any
+// public SDK header, so we declare the pieces we need ourselves.
+
+typedef struct _SYSTEM_HANDLE_TABLE_ENTRY_INFO {
+    ULONG ProcessId;
+    UCHAR ObjectTypeNumber;
+    UCHAR Flags;
+    USHORT Handle;
+    PVOID Object;
+    ACCESS_MASK GrantedAccess;
+} SYSTEM_HANDLE_TABLE_ENTRY_INFO;
+
+typedef struct _SYSTEM_HANDLE_INFORMATION {
+    ULONG NumberOfHandles;
+    SYSTEM_HANDLE_TABLE_ENTRY_INFO Handles[1];
+} SYSTEM_HANDLE_INFORMATION;
+
+constexpr ULONG SystemHandleInformationClass = 16;
+
+typedef NTSTATUS(NTAPI *NtQuerySystemInformationFn)(ULONG SystemInformationClass,
+                                                      PVOID SystemInformation,
+                                                      ULONG SystemInformationLength,
+                                                      PULONG ReturnLength);
+
+NtQuerySystemInformationFn resolveNtQuerySystemInformation() {
+    static NtQuerySystemInformationFn fn = reinterpret_cast<NtQuerySystemInformationFn>(
+        GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQuerySystemInformation"));
+    return fn;
+}
+
+// Locally-declared mirror of PUBLIC_OBJECT_TYPE_INFORMATION so we don't
+// depend on it being present in whatever winternl.h ships with the build
+// toolchain - only UNICODE_STRING (which is reliably there) is needed.
+typedef struct _LOCAL_OBJECT_TYPE_INFORMATION {
+    UNICODE_STRING TypeName;
+    ULONG Reserved[22];
+} LOCAL_OBJECT_TYPE_INFORMATION;
+
+constexpr ULONG ObjectTypeInformationClass = 2;
+
+typedef NTSTATUS(NTAPI *NtQueryObjectFn)(HANDLE Handle, ULONG ObjectInformationClass,
+                                          PVOID ObjectInformation, ULONG ObjectInformationLength,
+                                          PULONG ReturnLength);
+
+NtQueryObjectFn resolveNtQueryObject() {
+    static NtQueryObjectFn fn = reinterpret_cast<NtQueryObjectFn>(
+        GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryObject"));
+    return fn;
+}
+
+std::string tcpStateToStringWin(DWORD state) {
+    switch (state) {
+        case 1: return "CLOSED";
+        case 2: return "LISTEN";
+        case 3: return "SYN_SENT";
+        case 4: return "SYN_RCVD";
+        case 5: return "ESTABLISHED";
+        case 6: return "FIN_WAIT1";
+        case 7: return "FIN_WAIT2";
+        case 8: return "CLOSE_WAIT";
+        case 9: return "CLOSING";
+        case 10: return "LAST_ACK";
+        case 11: return "TIME_WAIT";
+        case 12: return "DELETE_TCB";
+        default: return "UNKNOWN";
+    }
+}
 
 std::string wideToUtf8(const std::wstring &wide) {
     if (wide.empty()) {
@@ -198,6 +273,391 @@ bool ProcessProviderWin::setPriority(uint64_t pid, ProcessPriority priority) {
     const bool ok = SetPriorityClass(process, priorityEnumToClass(priority)) != 0;
     CloseHandle(process);
     return ok;
+}
+
+std::vector<ThreadInfo> ProcessProviderWin::threads(uint64_t pid) {
+    std::vector<ThreadInfo> result;
+
+    HANDLE snapshotHandle = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    if (snapshotHandle == INVALID_HANDLE_VALUE) {
+        return result;
+    }
+
+    THREADENTRY32 entry;
+    entry.dwSize = sizeof(entry);
+    if (Thread32First(snapshotHandle, &entry)) {
+        do {
+            if (entry.th32OwnerProcessID != static_cast<DWORD>(pid)) {
+                continue;
+            }
+
+            ThreadInfo info;
+            info.tid = entry.th32ThreadID;
+            info.priority = entry.tpBasePri;
+            // Toolhelp32 doesn't expose scheduling state; a real value
+            // needs NtQuerySystemInformation(SystemProcessInformation)'s
+            // per-thread SYSTEM_THREAD_INFORMATION.ThreadState, which is a
+            // large variable-length structure not worth hand-declaring
+            // blind in a build we can't test here.
+            info.state = "Unknown";
+
+            result.push_back(std::move(info));
+        } while (Thread32Next(snapshotHandle, &entry));
+    }
+
+    CloseHandle(snapshotHandle);
+    return result;
+}
+
+std::vector<ModuleInfo> ProcessProviderWin::modules(uint64_t pid) {
+    std::vector<ModuleInfo> result;
+
+    HANDLE process =
+        OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, static_cast<DWORD>(pid));
+    if (process == nullptr) {
+        return result;
+    }
+
+    std::vector<HMODULE> moduleHandles(256);
+    DWORD needed = 0;
+    for (;;) {
+        if (!EnumProcessModulesEx(process, moduleHandles.data(),
+                                   static_cast<DWORD>(moduleHandles.size() * sizeof(HMODULE)), &needed,
+                                   LIST_MODULES_ALL)) {
+            CloseHandle(process);
+            return result;
+        }
+        const size_t count = needed / sizeof(HMODULE);
+        if (count <= moduleHandles.size()) {
+            moduleHandles.resize(count);
+            break;
+        }
+        moduleHandles.resize(count);
+    }
+
+    for (HMODULE mod : moduleHandles) {
+        wchar_t pathBuf[MAX_PATH] = {};
+        MODULEINFO info{};
+        if (GetModuleFileNameExW(process, mod, pathBuf, MAX_PATH) &&
+            GetModuleInformation(process, mod, &info, sizeof(info))) {
+            ModuleInfo module;
+            module.path = wideToUtf8(pathBuf);
+            const auto slash = module.path.find_last_of('\\');
+            module.name = slash == std::string::npos ? module.path : module.path.substr(slash + 1);
+            module.baseAddress = reinterpret_cast<uint64_t>(info.lpBaseOfDll);
+            module.sizeBytes = info.SizeOfImage;
+            result.push_back(std::move(module));
+        }
+    }
+
+    CloseHandle(process);
+    return result;
+}
+
+std::vector<MemoryRegionInfo> ProcessProviderWin::memoryRegions(uint64_t pid) {
+    std::vector<MemoryRegionInfo> result;
+
+    HANDLE process =
+        OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, static_cast<DWORD>(pid));
+    if (process == nullptr) {
+        return result;
+    }
+
+    SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+
+    auto *address = static_cast<unsigned char *>(sysInfo.lpMinimumApplicationAddress);
+    auto *maxAddress = static_cast<unsigned char *>(sysInfo.lpMaximumApplicationAddress);
+
+    MEMORY_BASIC_INFORMATION mbi;
+    while (address < maxAddress && VirtualQueryEx(process, address, &mbi, sizeof(mbi)) == sizeof(mbi)) {
+        if (mbi.State == MEM_COMMIT) {
+            MemoryRegionInfo region;
+            region.baseAddress = reinterpret_cast<uint64_t>(mbi.BaseAddress);
+            region.sizeBytes = mbi.RegionSize;
+
+            const DWORD p = mbi.Protect;
+            std::string prot;
+            prot += (p & (PAGE_READONLY | PAGE_READWRITE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE))
+                        ? 'r'
+                        : '-';
+            prot += (p & (PAGE_READWRITE | PAGE_EXECUTE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_WRITECOPY))
+                        ? 'w'
+                        : '-';
+            prot += (p & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))
+                        ? 'x'
+                        : '-';
+            region.protection = prot;
+
+            if (mbi.Type == MEM_IMAGE || mbi.Type == MEM_MAPPED) {
+                wchar_t fileName[MAX_PATH] = {};
+                if (GetMappedFileNameW(process, mbi.BaseAddress, fileName, MAX_PATH) > 0) {
+                    region.mappedFile = wideToUtf8(fileName);
+                }
+            }
+
+            result.push_back(std::move(region));
+        }
+
+        auto *next = static_cast<unsigned char *>(mbi.BaseAddress) + mbi.RegionSize;
+        if (next <= address) {
+            break; // guard against a zero-size region wedging the loop
+        }
+        address = next;
+    }
+
+    CloseHandle(process);
+    return result;
+}
+
+std::vector<HandleInfo> ProcessProviderWin::handles(uint64_t pid) {
+    std::vector<HandleInfo> result;
+
+    auto ntQuerySystemInformation = resolveNtQuerySystemInformation();
+    if (ntQuerySystemInformation == nullptr) {
+        return result;
+    }
+
+    std::vector<unsigned char> buffer(1 << 20); // 1 MiB initial guess
+    for (;;) {
+        ULONG returnLength = 0;
+        const NTSTATUS status = ntQuerySystemInformation(
+            SystemHandleInformationClass, buffer.data(), static_cast<ULONG>(buffer.size()), &returnLength);
+        if (status == 0) {
+            break; // STATUS_SUCCESS
+        }
+        if (status == static_cast<NTSTATUS>(0xC0000004L)) { // STATUS_INFO_LENGTH_MISMATCH
+            buffer.resize(buffer.size() * 2);
+            continue;
+        }
+        return result; // unexpected failure
+    }
+
+    auto *info = reinterpret_cast<SYSTEM_HANDLE_INFORMATION *>(buffer.data());
+    auto ntQueryObject = resolveNtQueryObject();
+    HANDLE targetProcess = OpenProcess(PROCESS_DUP_HANDLE, FALSE, static_cast<DWORD>(pid));
+
+    for (ULONG i = 0; i < info->NumberOfHandles; ++i) {
+        const auto &entry = info->Handles[i];
+        if (entry.ProcessId != static_cast<DWORD>(pid)) {
+            continue;
+        }
+
+        HandleInfo handleInfo;
+        handleInfo.handleValueOrFd = entry.Handle;
+
+        if (targetProcess != nullptr && ntQueryObject != nullptr) {
+            HANDLE dup = nullptr;
+            if (DuplicateHandle(targetProcess,
+                                 reinterpret_cast<HANDLE>(static_cast<uintptr_t>(entry.Handle)),
+                                 GetCurrentProcess(), &dup, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
+                unsigned char typeBuffer[1024];
+                ULONG returnLength = 0;
+                if (ntQueryObject(dup, ObjectTypeInformationClass, typeBuffer, sizeof(typeBuffer),
+                                   &returnLength) == 0) {
+                    auto *typeInfo = reinterpret_cast<LOCAL_OBJECT_TYPE_INFORMATION *>(typeBuffer);
+                    if (typeInfo->TypeName.Buffer != nullptr) {
+                        handleInfo.type = wideToUtf8(std::wstring(
+                            typeInfo->TypeName.Buffer, typeInfo->TypeName.Length / sizeof(wchar_t)));
+                    }
+                }
+                CloseHandle(dup);
+            }
+        }
+
+        result.push_back(std::move(handleInfo));
+    }
+
+    if (targetProcess != nullptr) {
+        CloseHandle(targetProcess);
+    }
+    return result;
+}
+
+std::vector<std::string> ProcessProviderWin::environment(uint64_t pid) {
+    std::vector<std::string> result;
+
+    HANDLE process =
+        OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, static_cast<DWORD>(pid));
+    if (process == nullptr) {
+        return result;
+    }
+
+    auto ntQueryInformationProcess = reinterpret_cast<NTSTATUS(NTAPI *)(HANDLE, ULONG, PVOID, ULONG, PULONG)>(
+        GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationProcess"));
+    if (ntQueryInformationProcess == nullptr) {
+        CloseHandle(process);
+        return result;
+    }
+
+    PROCESS_BASIC_INFORMATION pbi{};
+    ULONG returned = 0;
+    if (ntQueryInformationProcess(process, 0 /*ProcessBasicInformation*/, &pbi, sizeof(pbi), &returned) != 0) {
+        CloseHandle(process);
+        return result;
+    }
+
+    // Native-bitness PEB layout only (matches a 64-bit build inspecting
+    // another 64-bit process): ProcessParameters at PEB+0x20, and
+    // RTL_USER_PROCESS_PARAMETERS.Environment at +0x80 within that.
+    // A WOW64 target (32-bit process on 64-bit Windows) uses the 32-bit
+    // PEB layout instead and isn't handled here.
+    auto *pebProcessParamsPtr = reinterpret_cast<BYTE *>(pbi.PebBaseAddress) + 0x20;
+    PVOID processParameters = nullptr;
+    if (!ReadProcessMemory(process, pebProcessParamsPtr, &processParameters, sizeof(processParameters),
+                            nullptr)) {
+        CloseHandle(process);
+        return result;
+    }
+
+    auto *environmentPtrAddress = static_cast<BYTE *>(processParameters) + 0x80;
+    PVOID environmentBlock = nullptr;
+    if (!ReadProcessMemory(process, environmentPtrAddress, &environmentBlock, sizeof(environmentBlock),
+                            nullptr)) {
+        CloseHandle(process);
+        return result;
+    }
+
+    constexpr SIZE_T maxEnvBytes = 64 * 1024;
+    std::vector<wchar_t> envBuffer(maxEnvBytes / sizeof(wchar_t));
+    SIZE_T bytesRead = 0;
+    if (!ReadProcessMemory(process, environmentBlock, envBuffer.data(), maxEnvBytes, &bytesRead)) {
+        CloseHandle(process);
+        return result;
+    }
+
+    size_t start = 0;
+    const size_t count = bytesRead / sizeof(wchar_t);
+    for (size_t i = 0; i < count; ++i) {
+        if (envBuffer[i] == L'\0') {
+            if (i > start) {
+                result.push_back(wideToUtf8(std::wstring(envBuffer.data() + start, i - start)));
+                start = i + 1;
+            } else {
+                break; // double-NUL terminator
+            }
+        }
+    }
+
+    CloseHandle(process);
+    return result;
+}
+
+std::vector<NetworkConnectionInfo> ProcessProviderWin::networkConnections(uint64_t pid) {
+    std::vector<NetworkConnectionInfo> result;
+    const DWORD targetPid = static_cast<DWORD>(pid);
+
+    {
+        ULONG size = 0;
+        GetExtendedTcpTable(nullptr, &size, FALSE, AF_INET, TCP_TABLE_OWNER_PID_ALL, 0);
+        std::vector<unsigned char> buffer(size);
+        if (size > 0 &&
+            GetExtendedTcpTable(buffer.data(), &size, FALSE, AF_INET, TCP_TABLE_OWNER_PID_ALL, 0) ==
+                NO_ERROR) {
+            auto *table = reinterpret_cast<MIB_TCPTABLE_OWNER_PID *>(buffer.data());
+            for (DWORD i = 0; i < table->dwNumEntries; ++i) {
+                const auto &row = table->table[i];
+                if (row.dwOwningPid != targetPid) continue;
+
+                NetworkConnectionInfo info;
+                info.protocol = NetworkProtocol::Tcp;
+                char addrBuf[INET_ADDRSTRLEN];
+                in_addr local{};
+                local.s_addr = row.dwLocalAddr;
+                inet_ntop(AF_INET, &local, addrBuf, sizeof(addrBuf));
+                info.localAddress = addrBuf;
+                info.localPort = ntohs(static_cast<u_short>(row.dwLocalPort));
+                in_addr remote{};
+                remote.s_addr = row.dwRemoteAddr;
+                inet_ntop(AF_INET, &remote, addrBuf, sizeof(addrBuf));
+                info.remoteAddress = addrBuf;
+                info.remotePort = ntohs(static_cast<u_short>(row.dwRemotePort));
+                info.state = tcpStateToStringWin(row.dwState);
+                result.push_back(std::move(info));
+            }
+        }
+    }
+
+    {
+        ULONG size = 0;
+        GetExtendedTcpTable(nullptr, &size, FALSE, AF_INET6, TCP_TABLE_OWNER_PID_ALL, 0);
+        std::vector<unsigned char> buffer(size);
+        if (size > 0 &&
+            GetExtendedTcpTable(buffer.data(), &size, FALSE, AF_INET6, TCP_TABLE_OWNER_PID_ALL, 0) ==
+                NO_ERROR) {
+            auto *table = reinterpret_cast<MIB_TCP6TABLE_OWNER_PID *>(buffer.data());
+            for (DWORD i = 0; i < table->dwNumEntries; ++i) {
+                const auto &row = table->table[i];
+                if (row.dwOwningPid != targetPid) continue;
+
+                NetworkConnectionInfo info;
+                info.protocol = NetworkProtocol::Tcp6;
+                char addrBuf[INET6_ADDRSTRLEN];
+                in6_addr local{};
+                std::memcpy(&local, row.ucLocalAddr, sizeof(local));
+                inet_ntop(AF_INET6, &local, addrBuf, sizeof(addrBuf));
+                info.localAddress = addrBuf;
+                info.localPort = ntohs(static_cast<u_short>(row.dwLocalPort));
+                in6_addr remote{};
+                std::memcpy(&remote, row.ucRemoteAddr, sizeof(remote));
+                inet_ntop(AF_INET6, &remote, addrBuf, sizeof(addrBuf));
+                info.remoteAddress = addrBuf;
+                info.remotePort = ntohs(static_cast<u_short>(row.dwRemotePort));
+                info.state = tcpStateToStringWin(row.dwState);
+                result.push_back(std::move(info));
+            }
+        }
+    }
+
+    {
+        ULONG size = 0;
+        GetExtendedUdpTable(nullptr, &size, FALSE, AF_INET, UDP_TABLE_OWNER_PID, 0);
+        std::vector<unsigned char> buffer(size);
+        if (size > 0 &&
+            GetExtendedUdpTable(buffer.data(), &size, FALSE, AF_INET, UDP_TABLE_OWNER_PID, 0) == NO_ERROR) {
+            auto *table = reinterpret_cast<MIB_UDPTABLE_OWNER_PID *>(buffer.data());
+            for (DWORD i = 0; i < table->dwNumEntries; ++i) {
+                const auto &row = table->table[i];
+                if (row.dwOwningPid != targetPid) continue;
+
+                NetworkConnectionInfo info;
+                info.protocol = NetworkProtocol::Udp;
+                char addrBuf[INET_ADDRSTRLEN];
+                in_addr local{};
+                local.s_addr = row.dwLocalAddr;
+                inet_ntop(AF_INET, &local, addrBuf, sizeof(addrBuf));
+                info.localAddress = addrBuf;
+                info.localPort = ntohs(static_cast<u_short>(row.dwLocalPort));
+                result.push_back(std::move(info));
+            }
+        }
+    }
+
+    {
+        ULONG size = 0;
+        GetExtendedUdpTable(nullptr, &size, FALSE, AF_INET6, UDP_TABLE_OWNER_PID, 0);
+        std::vector<unsigned char> buffer(size);
+        if (size > 0 &&
+            GetExtendedUdpTable(buffer.data(), &size, FALSE, AF_INET6, UDP_TABLE_OWNER_PID, 0) == NO_ERROR) {
+            auto *table = reinterpret_cast<MIB_UDP6TABLE_OWNER_PID *>(buffer.data());
+            for (DWORD i = 0; i < table->dwNumEntries; ++i) {
+                const auto &row = table->table[i];
+                if (row.dwOwningPid != targetPid) continue;
+
+                NetworkConnectionInfo info;
+                info.protocol = NetworkProtocol::Udp6;
+                char addrBuf[INET6_ADDRSTRLEN];
+                in6_addr local{};
+                std::memcpy(&local, row.ucLocalAddr, sizeof(local));
+                inet_ntop(AF_INET6, &local, addrBuf, sizeof(addrBuf));
+                info.localAddress = addrBuf;
+                info.localPort = ntohs(static_cast<u_short>(row.dwLocalPort));
+                result.push_back(std::move(info));
+            }
+        }
+    }
+
+    return result;
 }
 
 } // namespace core

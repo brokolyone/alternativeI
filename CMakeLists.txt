@@ -11,6 +11,7 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 set(CORE_SOURCES
     src/core/ProcessInfo.h
+    src/core/ProcessDetails.h
     src/core/IProcessProvider.h
     src/core/ProcessProviderFactory.cpp
 )
@@ -32,6 +33,10 @@ set(GUI_SOURCES
     src/gui/MainWindow.cpp
     src/gui/ProcessTreeModel.h
     src/gui/ProcessTreeModel.cpp
+    src/gui/DetailTableModels.h
+    src/gui/DetailTableModels.cpp
+    src/gui/ProcessDetailsDialog.h
+    src/gui/ProcessDetailsDialog.cpp
 )
 
 add_executable(alternative_hacker
@@ -44,6 +49,6 @@ target_include_directories(alternative_hacker PRIVATE src)
 target_link_libraries(alternative_hacker PRIVATE Qt6::Widgets)
 
 if(WIN32)
-    target_link_libraries(alternative_hacker PRIVATE ntdll advapi32 psapi)
+    target_link_libraries(alternative_hacker PRIVATE ntdll advapi32 psapi iphlpapi ws2_32)
     target_compile_definitions(alternative_hacker PRIVATE UNICODE _UNICODE)
 endif()

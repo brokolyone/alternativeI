@@ -19,6 +19,19 @@ public:
     bool terminate(uint64_t pid) override;
     bool setPriority(uint64_t pid, ProcessPriority priority) override;
 
+    std::vector<ThreadInfo> threads(uint64_t pid) override;
+    std::vector<ModuleInfo> modules(uint64_t pid) override;
+    std::vector<MemoryRegionInfo> memoryRegions(uint64_t pid) override;
+    // Handle *type* is resolved (safe, never blocks per Process Hacker's own
+    // notes); handle *name* is left empty. Resolving names requires either
+    // a timeout-guarded worker thread (some named pipes/mailslots hang a
+    // plain NtQueryObject(ObjectNameInformation) call forever) or the
+    // kernel driver described in the project's privileged-ops doc - both
+    // out of scope for this pass.
+    std::vector<HandleInfo> handles(uint64_t pid) override;
+    std::vector<std::string> environment(uint64_t pid) override;
+    std::vector<NetworkConnectionInfo> networkConnections(uint64_t pid) override;
+
 private:
     struct CpuSample {
         uint64_t kernelAndUserTime100ns = 0;

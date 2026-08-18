@@ -18,6 +18,13 @@ public:
     bool terminate(uint64_t pid) override;
     bool setPriority(uint64_t pid, ProcessPriority priority) override;
 
+    std::vector<ThreadInfo> threads(uint64_t pid) override;
+    std::vector<ModuleInfo> modules(uint64_t pid) override;
+    std::vector<MemoryRegionInfo> memoryRegions(uint64_t pid) override;
+    std::vector<HandleInfo> handles(uint64_t pid) override;
+    std::vector<std::string> environment(uint64_t pid) override;
+    std::vector<NetworkConnectionInfo> networkConnections(uint64_t pid) override;
+
 private:
     struct CpuSample {
         uint64_t totalTimeTicks = 0;
