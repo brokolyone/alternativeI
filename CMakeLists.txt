@@ -74,16 +74,29 @@ if(WIN32)
     target_link_libraries(alternative_hacker PRIVATE ntdll advapi32 psapi iphlpapi ws2_32 pdh)
     target_compile_definitions(alternative_hacker PRIVATE UNICODE _UNICODE)
 
-    # Bundle the Qt runtime (DLLs + platform/style plugins) next to the exe
-    # so the NSIS installer built below has something self-contained to
-    # package - a bare alternative_hacker.exe won't run on a machine
-    # without a matching system Qt6 install.
+    # Bundle the Qt runtime (DLLs + platform/style plugins) so the NSIS
+    # installer built below has something self-contained to package - a
+    # bare alternative_hacker.exe won't run on a machine without a
+    # matching system Qt6 install.
+    #
+    # Deployed into its own directory (via windeployqt's --dir) rather
+    # than alongside the exe in the main build tree: an earlier version
+    # of this rule installed straight from $<TARGET_FILE_DIR:...>, which
+    # for the single-config Ninja generator used in CI *is* the build
+    # root - install(DIRECTORY ...) from there recursively copied the
+    # entire build tree, including CPack's own staging directory that it
+    # creates inside that same build root while packaging, into the
+    # package. `cmake --install` hung for 6+ minutes copying that
+    # self-referential/ever-growing tree before a CI timeout caught it.
+    set(QT_DEPLOY_DIR "${CMAKE_BINARY_DIR}/qt-deploy")
     find_program(WINDEPLOYQT_EXECUTABLE windeployqt)
     if(WINDEPLOYQT_EXECUTABLE)
         add_custom_command(TARGET alternative_hacker POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${QT_DEPLOY_DIR}"
+            COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:alternative_hacker>" "${QT_DEPLOY_DIR}/"
             COMMAND ${WINDEPLOYQT_EXECUTABLE} --no-compiler-runtime --no-translations
-                    "$<TARGET_FILE:alternative_hacker>"
-            COMMENT "Deploying Qt6 runtime next to alternative_hacker.exe"
+                    "${QT_DEPLOY_DIR}/$<TARGET_FILE_NAME:alternative_hacker>"
+            COMMENT "Deploying Qt6 runtime into ${QT_DEPLOY_DIR}"
         )
     else()
         message(WARNING "windeployqt not found - the packaged .exe won't include the Qt runtime")
@@ -118,16 +131,14 @@ endif()
 if(WIN32)
     install(TARGETS alternative_hacker diskutil RUNTIME DESTINATION .)
     if(WINDEPLOYQT_EXECUTABLE)
-        # Picks up whatever windeployqt dropped next to the exe (Qt DLLs,
-        # platforms/, styles/, etc.) without re-listing it all by hand.
-        # The exe/pdb/lib/exp files are excluded since install(TARGETS)
-        # above already placed the executables themselves.
-        install(DIRECTORY "$<TARGET_FILE_DIR:alternative_hacker>/" DESTINATION .
-                PATTERN "*.exe" EXCLUDE
-                PATTERN "*.pdb" EXCLUDE
-                PATTERN "*.lib" EXCLUDE
-                PATTERN "*.exp" EXCLUDE
-                PATTERN "CMakeFiles" EXCLUDE)
+        # Picks up whatever windeployqt dropped into its own deploy
+        # directory (Qt DLLs, platforms/, styles/, etc.) without
+        # re-listing it all by hand. That directory contains a *copy* of
+        # the exe (windeployqt needs one alongside the DLLs to scan), so
+        # it's excluded here - install(TARGETS) above already placed the
+        # real one.
+        install(DIRECTORY "${QT_DEPLOY_DIR}/" DESTINATION .
+                PATTERN "*.exe" EXCLUDE)
     endif()
 else()
     install(TARGETS alternative_hacker diskutil RUNTIME DESTINATION bin)
