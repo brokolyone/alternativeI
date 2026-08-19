@@ -9,6 +9,23 @@ set(CMAKE_AUTOUIC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
+# diskutil_core: platform-agnostic raw disk backup/restore logic (MBR/GPT
+# parsing, SHA-256, the backup/restore/verify copy loops). Shared between
+# the diskutil CLI and the GUI's Disk tab so both go through the exact
+# same safety-critical code path rather than maintaining two copies of
+# logic that can destroy data if it drifts.
+add_library(diskutil_core STATIC
+    src/diskutil/BlockDevice.h
+    src/diskutil/BlockDevice.cpp
+    src/diskutil/Partitioning.h
+    src/diskutil/Partitioning.cpp
+    src/diskutil/Sha256.h
+    src/diskutil/Sha256.cpp
+    src/diskutil/DiskOperations.h
+    src/diskutil/DiskOperations.cpp
+)
+target_include_directories(diskutil_core PUBLIC src)
+
 set(CORE_SOURCES
     src/core/ProcessInfo.h
     src/core/ProcessDetails.h
@@ -59,6 +76,14 @@ set(GUI_SOURCES
     src/gui/ServicesTableModel.cpp
     src/gui/ServicesView.h
     src/gui/ServicesView.cpp
+    src/gui/DiskWorker.h
+    src/gui/DiskWorker.cpp
+    src/gui/DiskDeviceList.h
+    src/gui/DiskDeviceList.cpp
+    src/gui/RestoreConfirmDialog.h
+    src/gui/RestoreConfirmDialog.cpp
+    src/gui/DiskToolsView.h
+    src/gui/DiskToolsView.cpp
 )
 
 add_executable(alternative_hacker
@@ -68,7 +93,7 @@ add_executable(alternative_hacker
 )
 
 target_include_directories(alternative_hacker PRIVATE src)
-target_link_libraries(alternative_hacker PRIVATE Qt6::Widgets)
+target_link_libraries(alternative_hacker PRIVATE Qt6::Widgets diskutil_core)
 
 if(WIN32)
     target_link_libraries(alternative_hacker PRIVATE ntdll advapi32 psapi iphlpapi ws2_32 pdh)
@@ -103,20 +128,12 @@ if(WIN32)
     endif()
 endif()
 
-# diskutil: standalone CLI for raw MBR/GPT/disk backup-restore. Kept free
-# of the Qt dependency so it builds (and can be shipped/audited) on its
-# own - see README's disk module warning before running it against a real
-# device.
-add_executable(diskutil
-    src/diskutil/main.cpp
-    src/diskutil/BlockDevice.h
-    src/diskutil/BlockDevice.cpp
-    src/diskutil/Partitioning.h
-    src/diskutil/Partitioning.cpp
-    src/diskutil/Sha256.h
-    src/diskutil/Sha256.cpp
-)
-target_include_directories(diskutil PRIVATE src)
+# diskutil: standalone CLI for raw MBR/GPT/disk backup-restore, on top of
+# diskutil_core. Kept free of the Qt dependency so it builds (and can be
+# shipped/audited) on its own - see README's disk module warning before
+# running it against a real device.
+add_executable(diskutil src/diskutil/main.cpp)
+target_link_libraries(diskutil PRIVATE diskutil_core)
 
 if(WIN32)
     target_compile_definitions(diskutil PRIVATE UNICODE _UNICODE)

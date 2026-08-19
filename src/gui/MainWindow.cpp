@@ -15,6 +15,7 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "DiskToolsView.h"
 #include "PerformanceView.h"
 #include "ProcessDetailsDialog.h"
 #include "ServicesView.h"
@@ -75,6 +76,7 @@ void MainWindow::buildUi() {
     tabs->addTab(central, QStringLiteral("Processes"));
     tabs->addTab(new PerformanceView(tabs), QStringLiteral("Performance"));
     tabs->addTab(new ServicesView(tabs), QStringLiteral("Services"));
+    tabs->addTab(new DiskToolsView(tabs), QStringLiteral("Disk"));
     setCentralWidget(tabs);
 
     statusLabel_ = new QLabel(this);

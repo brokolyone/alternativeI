@@ -1,34 +1,24 @@
 // diskutil: raw sector-level backup/restore for MBR/GPT (and arbitrary
 // LBA ranges, or a whole disk), with mandatory SHA-256 verification.
 //
-// Design goals, since this is the part of the project that can destroy
-// data if it's wrong:
-//   - backup is read-only and always safe to run.
-//   - restore defaults to a dry run: it prints exactly what it *would*
-//     write and refuses to touch anything until --yes is passed.
-//   - after every write, diskutil re-reads what it just wrote and
-//     compares its SHA-256 against the source image; a mismatch is a
-//     hard failure (non-zero exit), never a warning you can miss.
-//   - "custom"/"disk" writes to a size-mismatched region are refused
-//     outright rather than silently truncating or padding.
+// This is a thin CLI wrapper: all the actual copy/verify logic lives in
+// DiskOperations, shared with the GUI's "Disk" tab so both interfaces go
+// through the exact same safety-critical code path (see that header's
+// comments for the invariants: backup is read-only, restore defaults to
+// a dry run, a size-mismatched write is refused, every write is
+// independently re-read and re-hashed).
 
-#include <algorithm>
 #include <cstdio>
-#include <cstring>
-#include <fstream>
 #include <iostream>
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "BlockDevice.h"
+#include "DiskOperations.h"
 #include "Partitioning.h"
-#include "Sha256.h"
 
 namespace {
-
-constexpr size_t kChunkSize = 4 * 1024 * 1024;
 
 void printUsage() {
     std::cerr <<
@@ -66,72 +56,11 @@ std::string formatTypeGuidName(const std::string &guid) {
     return "Unknown";
 }
 
-bool computeFileSha256(const std::string &path, std::string *outHash, uint64_t *outSize) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) return false;
-
-    diskutil::Sha256 hasher;
-    std::vector<char> buffer(kChunkSize);
-    uint64_t total = 0;
-    while (file) {
-        file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-        const std::streamsize n = file.gcount();
-        if (n <= 0) break;
-        hasher.update(buffer.data(), static_cast<size_t>(n));
-        total += static_cast<uint64_t>(n);
-    }
-    *outHash = hasher.hexDigest();
-    *outSize = total;
-    return true;
-}
-
 struct RegionArgs {
     std::string region = "mbr";
     uint64_t startLba = 0;
     uint64_t sectors = 0;
 };
-
-// Resolves --region into a concrete [offset, length) byte range against an
-// already-open device. For "gpt" this requires actually reading the GPT
-// header, so it can fail if the device isn't GPT-partitioned.
-bool resolveRegion(diskutil::BlockDevice &device, const RegionArgs &args, uint64_t *offset,
-                    uint64_t *length, std::string *error) {
-    if (args.region == "mbr") {
-        *offset = 0;
-        *length = diskutil::kSectorSize;
-        return true;
-    }
-    if (args.region == "disk") {
-        *offset = 0;
-        *length = device.sizeBytes();
-        if (*length == 0) {
-            *error = "could not determine device size";
-            return false;
-        }
-        return true;
-    }
-    if (args.region == "gpt") {
-        auto gpt = diskutil::readGpt(device);
-        if (!gpt || !gpt->headerValid) {
-            *error = "no valid GPT header found (device isn't GPT-partitioned?)";
-            return false;
-        }
-        *offset = 0;
-        *length = diskutil::gptPrimaryRegionBytes(*gpt);
-        return true;
-    }
-    if (args.region == "custom") {
-        if (args.sectors == 0) {
-            *error = "--region custom requires --sectors N (and optionally --start-lba N)";
-            return false;
-        }
-        *offset = args.startLba * diskutil::kSectorSize;
-        *length = args.sectors * diskutil::kSectorSize;
-        return true;
-    }
-    *error = "unknown --region '" + args.region + "'";
-    return false;
-}
 
 bool parseRegionArgs(std::vector<std::string> &args, RegionArgs *out) {
     for (size_t i = 0; i < args.size();) {
@@ -148,6 +77,24 @@ bool parseRegionArgs(std::vector<std::string> &args, RegionArgs *out) {
             ++i;
         }
     }
+    return true;
+}
+
+bool regionSpecFromArgs(const RegionArgs &args, diskutil::RegionSpec *spec, std::string *error) {
+    if (args.region == "mbr") {
+        spec->kind = diskutil::RegionKind::Mbr;
+    } else if (args.region == "gpt") {
+        spec->kind = diskutil::RegionKind::Gpt;
+    } else if (args.region == "disk") {
+        spec->kind = diskutil::RegionKind::Disk;
+    } else if (args.region == "custom") {
+        spec->kind = diskutil::RegionKind::Custom;
+    } else {
+        *error = "unknown --region '" + args.region + "'";
+        return false;
+    }
+    spec->startLba = args.startLba;
+    spec->sectors = args.sectors;
     return true;
 }
 
@@ -205,8 +152,8 @@ int runInfo(const std::vector<std::string> &args) {
 }
 
 int runBackup(std::vector<std::string> args) {
-    RegionArgs region;
-    parseRegionArgs(args, &region);
+    RegionArgs regionArgs;
+    parseRegionArgs(args, &regionArgs);
 
     if (args.size() != 2) {
         std::cerr << "usage: diskutil backup --region <mbr|gpt|disk|custom> [--start-lba N "
@@ -217,56 +164,39 @@ int runBackup(std::vector<std::string> args) {
     const std::string &destPath = args[1];
 
     std::string error;
+    diskutil::RegionSpec spec;
+    if (!regionSpecFromArgs(regionArgs, &spec, &error)) {
+        std::cerr << "error: " << error << "\n";
+        return 1;
+    }
+
     auto source = diskutil::BlockDevice::open(sourcePath, false, &error);
     if (!source) {
         std::cerr << "error opening source: " << error << "\n";
         return 1;
     }
 
-    uint64_t offset = 0, length = 0;
-    if (!resolveRegion(*source, region, &offset, &length, &error)) {
-        std::cerr << "error: " << error << "\n";
+    const auto region = diskutil::resolveRegion(*source, spec);
+    if (!region.ok) {
+        std::cerr << "error: " << region.error << "\n";
         return 1;
     }
 
-    std::ofstream out(destPath, std::ios::binary | std::ios::trunc);
-    if (!out) {
-        std::cerr << "error: could not create output file '" << destPath << "'\n";
+    const auto outcome = diskutil::backupRegion(*source, region.offset, region.length, destPath);
+    if (!outcome.ok) {
+        std::cerr << "error: " << outcome.error << "\n";
         return 1;
     }
 
-    diskutil::Sha256 hasher;
-    std::vector<char> buffer(kChunkSize);
-    uint64_t remaining = length;
-    uint64_t position = offset;
-    while (remaining > 0) {
-        const size_t chunk = static_cast<size_t>(std::min<uint64_t>(remaining, buffer.size()));
-        if (!source->readAt(position, buffer.data(), chunk)) {
-            std::cerr << "error: short read at offset " << position << "\n";
-            return 1;
-        }
-        out.write(buffer.data(), static_cast<std::streamsize>(chunk));
-        hasher.update(buffer.data(), chunk);
-        position += chunk;
-        remaining -= chunk;
-    }
-    out.close();
-
-    const std::string digest = hasher.hexDigest();
-    std::ofstream sidecar(destPath + ".sha256");
-    if (sidecar) {
-        sidecar << digest << "  " << destPath << "\n";
-    }
-
-    std::cout << "Backed up " << length << " bytes (region=" << region.region << ", offset=" << offset
-              << ") from " << sourcePath << " to " << destPath << "\n";
-    std::cout << "SHA-256: " << digest << "\n";
+    std::cout << "Backed up " << outcome.bytesCopied << " bytes (region=" << regionArgs.region
+              << ", offset=" << region.offset << ") from " << sourcePath << " to " << destPath << "\n";
+    std::cout << "SHA-256: " << outcome.sha256 << "\n";
     return 0;
 }
 
 int runRestore(std::vector<std::string> args) {
-    RegionArgs region;
-    parseRegionArgs(args, &region);
+    RegionArgs regionArgs;
+    parseRegionArgs(args, &regionArgs);
 
     bool confirmed = false;
     for (auto it = args.begin(); it != args.end();) {
@@ -286,104 +216,44 @@ int runRestore(std::vector<std::string> args) {
     const std::string &inputPath = args[0];
     const std::string &targetPath = args[1];
 
-    std::string inputHash;
-    uint64_t inputSize = 0;
-    if (!computeFileSha256(inputPath, &inputHash, &inputSize)) {
-        std::cerr << "error: could not read input file '" << inputPath << "'\n";
-        return 1;
-    }
-    if (inputSize == 0) {
-        std::cerr << "error: input file is empty\n";
+    std::string error;
+    diskutil::RegionSpec spec;
+    if (!regionSpecFromArgs(regionArgs, &spec, &error)) {
+        std::cerr << "error: " << error << "\n";
         return 1;
     }
 
-    std::string error;
     auto target = diskutil::BlockDevice::open(targetPath, confirmed, &error);
     if (!target) {
         std::cerr << "error opening target: " << error << "\n";
         return 1;
     }
 
-    // The restore's byte range comes from the input file itself (offset
-    // from --region/--start-lba, length = however many bytes the backup
-    // actually contains) rather than re-deriving it from the target's
-    // current partition table - the whole point of a restore is that the
-    // target's table may be gone/corrupt.
-    uint64_t offset = 0;
-    if (region.region == "custom" || region.region == "mbr") {
-        offset = region.startLba * diskutil::kSectorSize;
-    }
-    const uint64_t length = inputSize;
-
-    if (region.region == "disk" && length > target->sizeBytes()) {
-        std::cerr << "error: input image (" << length << " bytes) is larger than the target device ("
-                  << target->sizeBytes() << " bytes) - refusing to restore\n";
-        return 1;
-    }
-    if (target->isSpecialDevice() && offset + length > target->sizeBytes() && target->sizeBytes() > 0) {
-        std::cerr << "error: region [" << offset << ", " << (offset + length)
-                  << ") extends past the end of the target device (" << target->sizeBytes()
-                  << " bytes) - refusing to restore\n";
+    const auto plan = diskutil::planRestore(inputPath, *target, spec);
+    if (!plan.ok) {
+        std::cerr << "error: " << plan.error << "\n";
         return 1;
     }
 
     std::cout << "Restore plan:\n";
-    std::cout << "  Source:      " << inputPath << " (" << inputSize << " bytes)\n";
-    std::cout << "  Source SHA:  " << inputHash << "\n";
-    std::cout << "  Target:      " << targetPath << (target->isSpecialDevice() ? " (block device)" : "")
+    std::cout << "  Source:      " << inputPath << " (" << plan.inputSizeBytes << " bytes)\n";
+    std::cout << "  Source SHA:  " << plan.inputSha256 << "\n";
+    std::cout << "  Target:      " << targetPath << (plan.targetIsSpecialDevice ? " (block device)" : "")
               << "\n";
-    std::cout << "  Byte range:  [" << offset << ", " << (offset + length) << ")\n";
+    std::cout << "  Byte range:  [" << plan.offset << ", " << (plan.offset + plan.length) << ")\n";
 
     if (!confirmed) {
         std::cout << "\nDry run only - no data was written. Re-run with --yes to actually write.\n";
         return 0;
     }
 
-    if (target->isSpecialDevice()) {
+    if (plan.targetIsSpecialDevice) {
         std::cout << "\n*** WRITING TO A BLOCK DEVICE: " << targetPath << " ***\n";
     }
 
-    std::ifstream in(inputPath, std::ios::binary);
-    std::vector<char> buffer(kChunkSize);
-    uint64_t remaining = length;
-    uint64_t position = offset;
-    while (remaining > 0) {
-        const size_t chunk = static_cast<size_t>(std::min<uint64_t>(remaining, buffer.size()));
-        in.read(buffer.data(), static_cast<std::streamsize>(chunk));
-        if (in.gcount() != static_cast<std::streamsize>(chunk)) {
-            std::cerr << "error: short read from input file\n";
-            return 1;
-        }
-        if (!target->writeAt(position, buffer.data(), chunk)) {
-            std::cerr << "error: short write at offset " << position << " - target may now be in an "
-                                                                          "inconsistent state\n";
-            return 1;
-        }
-        position += chunk;
-        remaining -= chunk;
-    }
-
-    // Verification pass: re-read exactly what was just written and hash
-    // it independently, rather than trusting the write calls succeeded.
-    diskutil::Sha256 verifyHasher;
-    remaining = length;
-    position = offset;
-    while (remaining > 0) {
-        const size_t chunk = static_cast<size_t>(std::min<uint64_t>(remaining, buffer.size()));
-        if (!target->readAt(position, buffer.data(), chunk)) {
-            std::cerr << "error: could not read back target for verification\n";
-            return 1;
-        }
-        verifyHasher.update(buffer.data(), chunk);
-        position += chunk;
-        remaining -= chunk;
-    }
-    const std::string verifyHash = verifyHasher.hexDigest();
-
-    if (verifyHash != inputHash) {
-        std::cerr << "\n*** VERIFICATION FAILED ***\n";
-        std::cerr << "expected: " << inputHash << "\n";
-        std::cerr << "actual:   " << verifyHash << "\n";
+    const auto outcome = diskutil::performRestore(inputPath, *target, plan);
+    if (!outcome.ok) {
+        std::cerr << "\n*** " << outcome.error << " ***\n";
         return 1;
     }
 
