@@ -103,7 +103,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: build/*.exe
+          # Narrow to the CPack-produced installer only: build/*.exe would
+          # also match the raw alternative_hacker.exe/diskutil.exe build
+          # outputs sitting next to it, which aren't installers.
+          path: build/alternative-hacker-*-win64.exe
 
   publish-release:
     needs: [build-linux-deb, build-windows-installer]
