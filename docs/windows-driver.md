@@ -53,7 +53,7 @@ This is an admin diagnostic tool, not a rootkit. The driver must **not**:
 
 ## IOCTL surface (proposed)
 
-A `FILE_DEVICE_UNKNOWN` device, exposed under `\Device\AlternativeHackerKph`
+A `FILE_DEVICE_UNKNOWN` device, exposed under `\Device\AltToolsKph`
 with a symbolic link the user-mode side opens by name. KMDF (Kernel-Mode
 Driver Framework), not raw WDM — far less boilerplate, well-trodden for
 this exact class of driver.

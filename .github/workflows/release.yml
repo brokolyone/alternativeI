@@ -83,7 +83,7 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
-        run: cmake --build build --target alternative_hacker diskutil
+        run: cmake --build build --target alttools diskutil
 
       # windows-latest doesn't ship NSIS despite earlier docs suggesting
       # otherwise (CPack's NSIS generator failed with "Cannot find NSIS
@@ -104,9 +104,9 @@ jobs:
         with:
           name: windows-installer
           # Narrow to the CPack-produced installer only: build/*.exe would
-          # also match the raw alternative_hacker.exe/diskutil.exe build
-          # outputs sitting next to it, which aren't installers.
-          path: build/alternative-hacker-*-win64.exe
+          # also match the raw alttools.exe/diskutil.exe build outputs
+          # sitting next to it, which aren't installers.
+          path: build/alttools-*-win64.exe
 
   publish-release:
     needs: [build-linux-deb, build-windows-installer]

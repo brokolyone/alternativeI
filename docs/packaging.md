@@ -8,7 +8,7 @@ particular) get made deliberately instead of by accident.
 
 ## Linux
 
-Two targets ship: `alternative_hacker` (the GUI, needs Qt6) and `diskutil`
+Two targets ship: `alttools` (the GUI, needs Qt6) and `diskutil`
 (the CLI, no Qt dependency — worth keeping installable on its own for
 headless/server use).
 
@@ -61,7 +61,7 @@ very occasional need), the plan is:
 ### Elevation model
 
 Same "elevate the one action, not the whole app" principle as Linux:
-- `alternative_hacker.exe` ships **without** an
+- `alttools.exe` ships **without** an
   `requireAdministrator` application manifest — it launches at normal
   user privilege.
 - Actions that need more (opening a protected process via the future
@@ -81,9 +81,9 @@ Same "elevate the one action, not the whole app" principle as Linux:
 MSI via WiX, or a simple NSIS installer if MSI's authoring overhead isn't
 worth it for a tool this size — no strong reason to prefer one over the
 other yet. Either way the installer needs to, itself running elevated:
-1. Copy `alternative_hacker.exe`, `diskutil.exe`, and the Qt6 runtime DLLs
+1. Copy `alttools.exe`, `diskutil.exe`, and the Qt6 runtime DLLs
    (`windeployqt` generates the exact dependency set) to
-   `%ProgramFiles%\AlternativeHacker\`.
+   `%ProgramFiles%\AltTools\`.
 2. **Not** install or start the kernel driver as part of a default
    install — until `docs/windows-driver.md` is actually built, signed,
    and audited, there's nothing to install. When it exists, the installer

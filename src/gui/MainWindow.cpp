@@ -24,7 +24,7 @@ namespace gui {
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), provider_(core::createDefaultProcessProvider()) {
-    setWindowTitle(QStringLiteral("Alternative Hacker — Process Manager"));
+    setWindowTitle(QStringLiteral("AltTools — Process Manager"));
     resize(1100, 700);
 
     buildUi();

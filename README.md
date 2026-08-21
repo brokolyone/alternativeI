@@ -57,8 +57,8 @@
 ```sh
 sudo apt install qt6-base-dev cmake ninja-build build-essential
 cmake -S . -B build -G Ninja
-cmake --build build --target alternative_hacker
-./build/alternative_hacker
+cmake --build build --target alttools
+./build/alttools
 ```
 
 ### Windows
@@ -67,7 +67,7 @@ cmake --build build --target alternative_hacker
 
 ```powershell
 cmake -S . -B build -G "Visual Studio 17 2022" -DCMAKE_PREFIX_PATH="C:\Qt\6.x\msvc2019_64"
-cmake --build build --config Release --target alternative_hacker
+cmake --build build --config Release --target alttools
 ```
 
 ## diskutil: посекторный backup/restore

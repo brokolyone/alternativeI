@@ -1,4 +1,4 @@
-alternative-hacker (0.1.0-1) unstable; urgency=low
+alttools (0.1.0-1) unstable; urgency=low
 
   * Initial release: process tree view, per-process properties dialog
     (threads/modules/memory/handles/environment/network), system

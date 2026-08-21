@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(AlternativeHacker VERSION 0.1.0 LANGUAGES CXX)
+project(AltTools VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -86,22 +86,22 @@ set(GUI_SOURCES
     src/gui/DiskToolsView.cpp
 )
 
-add_executable(alternative_hacker
+add_executable(alttools
     src/main.cpp
     ${CORE_SOURCES}
     ${GUI_SOURCES}
 )
 
-target_include_directories(alternative_hacker PRIVATE src)
-target_link_libraries(alternative_hacker PRIVATE Qt6::Widgets diskutil_core)
+target_include_directories(alttools PRIVATE src)
+target_link_libraries(alttools PRIVATE Qt6::Widgets diskutil_core)
 
 if(WIN32)
-    target_link_libraries(alternative_hacker PRIVATE ntdll advapi32 psapi iphlpapi ws2_32 pdh)
-    target_compile_definitions(alternative_hacker PRIVATE UNICODE _UNICODE)
+    target_link_libraries(alttools PRIVATE ntdll advapi32 psapi iphlpapi ws2_32 pdh)
+    target_compile_definitions(alttools PRIVATE UNICODE _UNICODE)
 
     # Bundle the Qt runtime (DLLs + platform/style plugins) so the NSIS
     # installer built below has something self-contained to package - a
-    # bare alternative_hacker.exe won't run on a machine without a
+    # bare alttools.exe won't run on a machine without a
     # matching system Qt6 install.
     #
     # Deployed into its own directory (via windeployqt's --dir) rather
@@ -116,11 +116,11 @@ if(WIN32)
     set(QT_DEPLOY_DIR "${CMAKE_BINARY_DIR}/qt-deploy")
     find_program(WINDEPLOYQT_EXECUTABLE windeployqt)
     if(WINDEPLOYQT_EXECUTABLE)
-        add_custom_command(TARGET alternative_hacker POST_BUILD
+        add_custom_command(TARGET alttools POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "${QT_DEPLOY_DIR}"
-            COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:alternative_hacker>" "${QT_DEPLOY_DIR}/"
+            COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:alttools>" "${QT_DEPLOY_DIR}/"
             COMMAND ${WINDEPLOYQT_EXECUTABLE} --no-compiler-runtime --no-translations
-                    "${QT_DEPLOY_DIR}/$<TARGET_FILE_NAME:alternative_hacker>"
+                    "${QT_DEPLOY_DIR}/$<TARGET_FILE_NAME:alttools>"
             COMMENT "Deploying Qt6 runtime into ${QT_DEPLOY_DIR}"
         )
     else()
@@ -146,7 +146,7 @@ endif()
 # DLLs in one directory").
 
 if(WIN32)
-    install(TARGETS alternative_hacker diskutil RUNTIME DESTINATION .)
+    install(TARGETS alttools diskutil RUNTIME DESTINATION .)
     if(WINDEPLOYQT_EXECUTABLE)
         # Picks up whatever windeployqt dropped into its own deploy
         # directory (Qt DLLs, platforms/, styles/, etc.) without
@@ -158,11 +158,11 @@ if(WIN32)
                 PATTERN "*.exe" EXCLUDE)
     endif()
 else()
-    install(TARGETS alternative_hacker diskutil RUNTIME DESTINATION bin)
-    install(FILES packaging/linux/alternative-hacker.desktop
+    install(TARGETS alttools diskutil RUNTIME DESTINATION bin)
+    install(FILES packaging/linux/alttools.desktop
             DESTINATION share/applications)
     install(FILES packaging/linux/copyright
-            DESTINATION share/doc/alternative-hacker)
+            DESTINATION share/doc/alttools)
 
     add_custom_command(
         OUTPUT ${CMAKE_BINARY_DIR}/changelog.Debian.gz
@@ -172,12 +172,12 @@ else()
     )
     add_custom_target(deb_changelog ALL DEPENDS ${CMAKE_BINARY_DIR}/changelog.Debian.gz)
     install(FILES ${CMAKE_BINARY_DIR}/changelog.Debian.gz
-            DESTINATION share/doc/alternative-hacker)
+            DESTINATION share/doc/alttools)
 endif()
 
 # --- CPack: `.deb` on Linux, NSIS `.exe` installer on Windows ----------
 
-set(CPACK_PACKAGE_NAME "alternative-hacker")
+set(CPACK_PACKAGE_NAME "alttools")
 set(CPACK_PACKAGE_VENDOR "alternativeI")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Process manager and disk backup/restore tool")
 # CPack DEB prepends CPACK_PACKAGE_DESCRIPTION_SUMMARY as the synopsis
@@ -208,11 +208,11 @@ if(UNIX AND NOT WIN32)
     set(CPACK_DEBIAN_PACKAGE_RELEASE "1")
 elseif(WIN32)
     set(CPACK_GENERATOR "NSIS")
-    set(CPACK_NSIS_PACKAGE_NAME "Alternative Hacker")
-    set(CPACK_NSIS_DISPLAY_NAME "Alternative Hacker")
+    set(CPACK_NSIS_PACKAGE_NAME "AltTools")
+    set(CPACK_NSIS_DISPLAY_NAME "AltTools")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
     set(CPACK_NSIS_MODIFY_PATH ON) # offers to add diskutil.exe to PATH
-    set(CPACK_PACKAGE_EXECUTABLES "alternative_hacker" "Alternative Hacker")
+    set(CPACK_PACKAGE_EXECUTABLES "alttools" "AltTools")
 endif()
 
 include(CPack)
