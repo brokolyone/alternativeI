@@ -9,6 +9,15 @@ set(CMAKE_AUTOUIC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
+# Generates src/gui/AppVersion.h (kAppVersion) from the PROJECT_VERSION set
+# above, so the About dialog can't drift out of sync with the version CPack
+# and the release tag actually use.
+configure_file(
+    src/gui/AppVersion.h.in
+    ${CMAKE_BINARY_DIR}/generated/gui/AppVersion.h
+    @ONLY
+)
+
 # diskutil_core: platform-agnostic raw disk backup/restore logic (MBR/GPT
 # parsing, SHA-256, the backup/restore/verify copy loops). Shared between
 # the diskutil CLI and the GUI's Disk tab so both go through the exact
@@ -60,6 +69,12 @@ elseif(UNIX)
 endif()
 
 set(GUI_SOURCES
+    src/gui/i18n.h
+    src/gui/i18n.cpp
+    src/gui/AboutDialog.h
+    src/gui/AboutDialog.cpp
+    src/gui/SettingsDialog.h
+    src/gui/SettingsDialog.cpp
     src/gui/MainWindow.h
     src/gui/MainWindow.cpp
     src/gui/ProcessTreeModel.h
@@ -92,7 +107,7 @@ add_executable(alttools
     ${GUI_SOURCES}
 )
 
-target_include_directories(alttools PRIVATE src)
+target_include_directories(alttools PRIVATE src ${CMAKE_BINARY_DIR}/generated/gui)
 target_link_libraries(alttools PRIVATE Qt6::Widgets diskutil_core)
 
 if(WIN32)

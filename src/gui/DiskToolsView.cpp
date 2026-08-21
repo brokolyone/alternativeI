@@ -18,6 +18,8 @@
 #include <QThread>
 #include <QVBoxLayout>
 
+#include "i18n.h"
+
 namespace gui {
 
 DiskToolsView::DiskToolsView(QWidget *parent) : QWidget(parent) {
@@ -48,41 +50,42 @@ void DiskToolsView::buildUi() {
     auto *layout = new QVBoxLayout(this);
 
     auto *pathRow = new QHBoxLayout();
-    pathRow->addWidget(new QLabel(QStringLiteral("Device or image:"), this));
+    pathRow->addWidget(new QLabel(i18n::t("Device or image:", "Устройство или образ:"), this));
     pathCombo_ = new QComboBox(this);
     pathCombo_->setObjectName(QStringLiteral("diskPathCombo"));
     pathCombo_->setEditable(true);
     pathCombo_->setInsertPolicy(QComboBox::NoInsert);
     pathCombo_->setMinimumWidth(320);
     pathRow->addWidget(pathCombo_, 1);
-    refreshButton_ = new QPushButton(QStringLiteral("Refresh devices"), this);
+    refreshButton_ = new QPushButton(i18n::t("Refresh devices", "Обновить устройства"), this);
     connect(refreshButton_, &QPushButton::clicked, this, &DiskToolsView::refreshDeviceList);
     pathRow->addWidget(refreshButton_);
-    auto *browseButton = new QPushButton(QStringLiteral("Browse image..."), this);
+    auto *browseButton = new QPushButton(i18n::t("Browse image...", "Выбрать образ..."), this);
     connect(browseButton, &QPushButton::clicked, this, &DiskToolsView::browseForImage);
     pathRow->addWidget(browseButton);
     layout->addLayout(pathRow);
 
     auto *regionRow = new QHBoxLayout();
-    regionRow->addWidget(new QLabel(QStringLiteral("Region:"), this));
+    regionRow->addWidget(new QLabel(i18n::t("Region:", "Область:"), this));
     regionCombo_ = new QComboBox(this);
     // Order must match core::RegionKind: Mbr=0, Gpt=1, Disk=2, Custom=3.
-    regionCombo_->addItem(QStringLiteral("MBR (512 bytes)"));
-    regionCombo_->addItem(QStringLiteral("GPT (protective MBR + header + partition table)"));
-    regionCombo_->addItem(QStringLiteral("Whole disk"));
-    regionCombo_->addItem(QStringLiteral("Custom LBA range"));
+    regionCombo_->addItem(i18n::t("MBR (512 bytes)", "MBR (512 байт)"));
+    regionCombo_->addItem(i18n::t("GPT (protective MBR + header + partition table)",
+                                   "GPT (защитный MBR + заголовок + таблица разделов)"));
+    regionCombo_->addItem(i18n::t("Whole disk", "Весь диск"));
+    regionCombo_->addItem(i18n::t("Custom LBA range", "Произвольный диапазон LBA"));
     regionRow->addWidget(regionCombo_);
 
     customRegionRow_ = new QWidget(this);
     auto *customLayout = new QHBoxLayout(customRegionRow_);
     customLayout->setContentsMargins(0, 0, 0, 0);
     auto *digitsValidator = new QRegularExpressionValidator(QRegularExpression("\\d+"), this);
-    customLayout->addWidget(new QLabel(QStringLiteral("Start LBA:"), customRegionRow_));
+    customLayout->addWidget(new QLabel(i18n::t("Start LBA:", "Начальный LBA:"), customRegionRow_));
     startLbaEdit_ = new QLineEdit(QStringLiteral("0"), customRegionRow_);
     startLbaEdit_->setValidator(digitsValidator);
     startLbaEdit_->setMaximumWidth(120);
     customLayout->addWidget(startLbaEdit_);
-    customLayout->addWidget(new QLabel(QStringLiteral("Sectors:"), customRegionRow_));
+    customLayout->addWidget(new QLabel(i18n::t("Sectors:", "Секторов:"), customRegionRow_));
     sectorsEdit_ = new QLineEdit(customRegionRow_);
     sectorsEdit_->setValidator(digitsValidator);
     sectorsEdit_->setMaximumWidth(120);
@@ -97,13 +100,13 @@ void DiskToolsView::buildUi() {
     });
 
     auto *buttonRow = new QHBoxLayout();
-    infoButton_ = new QPushButton(QStringLiteral("Show Info"), this);
+    infoButton_ = new QPushButton(i18n::t("Show Info", "Показать информацию"), this);
     connect(infoButton_, &QPushButton::clicked, this, &DiskToolsView::showInfo);
     buttonRow->addWidget(infoButton_);
-    backupButton_ = new QPushButton(QStringLiteral("Backup..."), this);
+    backupButton_ = new QPushButton(i18n::t("Backup...", "Резервная копия..."), this);
     connect(backupButton_, &QPushButton::clicked, this, &DiskToolsView::startBackup);
     buttonRow->addWidget(backupButton_);
-    restoreButton_ = new QPushButton(QStringLiteral("Restore..."), this);
+    restoreButton_ = new QPushButton(i18n::t("Restore...", "Восстановить..."), this);
     connect(restoreButton_, &QPushButton::clicked, this, &DiskToolsView::startRestore);
     buttonRow->addWidget(restoreButton_);
     buttonRow->addStretch(1);
@@ -122,8 +125,11 @@ void DiskToolsView::buildUi() {
     log_->setFont(monoFont);
     layout->addWidget(log_, 1);
 
-    appendLog(QStringLiteral("Backup is read-only and always safe. Restore always shows a plan and "
-                              "requires typing the target path to confirm before anything is written."));
+    appendLog(i18n::t("Backup is read-only and always safe. Restore always shows a plan and "
+                       "requires typing the target path to confirm before anything is written.",
+                       "Резервное копирование доступно только для чтения и всегда безопасно. "
+                       "Восстановление всегда показывает план и требует ввода пути цели для "
+                       "подтверждения перед записью."));
 }
 
 void DiskToolsView::setBusy(bool busy) {
@@ -167,7 +173,8 @@ void DiskToolsView::refreshDeviceList() {
 }
 
 void DiskToolsView::browseForImage() {
-    const QString path = QFileDialog::getOpenFileName(this, QStringLiteral("Select image file"));
+    const QString path =
+        QFileDialog::getOpenFileName(this, i18n::t("Select image file", "Выберите файл образа"));
     if (!path.isEmpty()) {
         pathCombo_->setEditText(path);
     }
@@ -190,33 +197,38 @@ QString resolvedPath(QComboBox *combo) {
 void DiskToolsView::showInfo() {
     const QString path = resolvedPath(pathCombo_);
     if (path.isEmpty()) {
-        appendLog(QStringLiteral("Enter or select a device/image path first."));
+        appendLog(i18n::t("Enter or select a device/image path first.",
+                           "Сначала введите или выберите путь к устройству/образу."));
         return;
     }
     setBusy(true);
-    appendLog(QStringLiteral("--- Info: %1 ---").arg(path));
+    appendLog(i18n::t("--- Info: %1 ---", "--- Информация: %1 ---").arg(path));
     QMetaObject::invokeMethod(worker_, "doInfo", Qt::QueuedConnection, Q_ARG(QString, path));
 }
 
 void DiskToolsView::startBackup() {
     const QString path = resolvedPath(pathCombo_);
     if (path.isEmpty()) {
-        appendLog(QStringLiteral("Enter or select a device/image path first."));
+        appendLog(i18n::t("Enter or select a device/image path first.",
+                           "Сначала введите или выберите путь к устройству/образу."));
         return;
     }
 
     quint64 startLba = 0, sectors = 0;
     const int regionKind = currentRegionKind();
     if (regionKind == 3 && !customRegionFields(&startLba, &sectors)) {
-        appendLog(QStringLiteral("Enter a valid start LBA and a non-zero sector count for a custom region."));
+        appendLog(i18n::t("Enter a valid start LBA and a non-zero sector count for a custom region.",
+                           "Введите корректный начальный LBA и ненулевое число секторов для "
+                           "произвольной области."));
         return;
     }
 
-    const QString outputPath = QFileDialog::getSaveFileName(this, QStringLiteral("Backup to file"));
+    const QString outputPath =
+        QFileDialog::getSaveFileName(this, i18n::t("Backup to file", "Сохранить резервную копию в файл"));
     if (outputPath.isEmpty()) return;
 
     setBusy(true);
-    appendLog(QStringLiteral("--- Backup: %1 -> %2 ---").arg(path, outputPath));
+    appendLog(i18n::t("--- Backup: %1 -> %2 ---", "--- Резервная копия: %1 -> %2 ---").arg(path, outputPath));
     QMetaObject::invokeMethod(worker_, "doBackup", Qt::QueuedConnection, Q_ARG(QString, path),
                                Q_ARG(int, regionKind), Q_ARG(quint64, startLba), Q_ARG(quint64, sectors),
                                Q_ARG(QString, outputPath));
@@ -225,18 +237,20 @@ void DiskToolsView::startBackup() {
 void DiskToolsView::startRestore() {
     const QString targetPath = resolvedPath(pathCombo_);
     if (targetPath.isEmpty()) {
-        appendLog(QStringLiteral("Enter or select a target device/image path first."));
+        appendLog(i18n::t("Enter or select a target device/image path first.",
+                           "Сначала введите или выберите путь к целевому устройству/образу."));
         return;
     }
 
-    const QString inputPath =
-        QFileDialog::getOpenFileName(this, QStringLiteral("Select backup image to restore"));
+    const QString inputPath = QFileDialog::getOpenFileName(
+        this, i18n::t("Select backup image to restore", "Выберите файл резервной копии для восстановления"));
     if (inputPath.isEmpty()) return;
 
     quint64 startLba = 0, sectors = 0;
     const int regionKind = currentRegionKind();
     if (regionKind == 3 && !customRegionFields(&startLba, &sectors)) {
-        appendLog(QStringLiteral("Enter a valid start LBA for a custom region."));
+        appendLog(i18n::t("Enter a valid start LBA for a custom region.",
+                           "Введите корректный начальный LBA для произвольной области."));
         return;
     }
 
@@ -246,7 +260,8 @@ void DiskToolsView::startRestore() {
     pendingRestoreStartLba_ = startLba;
 
     setBusy(true);
-    appendLog(QStringLiteral("--- Planning restore: %1 -> %2 ---").arg(inputPath, targetPath));
+    appendLog(i18n::t("--- Planning restore: %1 -> %2 ---", "--- Планирование восстановления: %1 -> %2 ---")
+                  .arg(inputPath, targetPath));
     QMetaObject::invokeMethod(worker_, "doPlanRestore", Qt::QueuedConnection, Q_ARG(QString, inputPath),
                                Q_ARG(QString, targetPath), Q_ARG(int, regionKind),
                                Q_ARG(quint64, startLba));
@@ -255,7 +270,7 @@ void DiskToolsView::startRestore() {
 void DiskToolsView::onInfoReady(bool ok, const QString &error, const QString &text) {
     setBusy(false);
     if (!ok) {
-        appendLog(QStringLiteral("error: %1").arg(error));
+        appendLog(i18n::t("error: %1", "ошибка: %1").arg(error));
         return;
     }
     appendLog(text);
@@ -271,15 +286,16 @@ void DiskToolsView::onBackupFinished(bool ok, const QString &error, quint64 byte
                                       const QString &sha256) {
     setBusy(false);
     if (!ok) {
-        appendLog(QStringLiteral("Backup failed: %1").arg(error));
-        QMessageBox::warning(this, QStringLiteral("Backup failed"), error);
+        appendLog(i18n::t("Backup failed: %1", "Резервное копирование не удалось: %1").arg(error));
+        QMessageBox::warning(this, i18n::t("Backup failed", "Резервное копирование не удалось"), error);
         return;
     }
-    appendLog(QStringLiteral("Backup complete: %1 bytes, SHA-256 %2")
+    appendLog(i18n::t("Backup complete: %1 bytes, SHA-256 %2", "Резервная копия готова: %1 байт, SHA-256 %2")
                   .arg(QLocale().toString(static_cast<qlonglong>(bytesCopied)), sha256));
-    QMessageBox::information(this, QStringLiteral("Backup complete"),
-                              QStringLiteral("%1 copied.\nSHA-256: %2")
-                                  .arg(QLocale().formattedDataSize(static_cast<qint64>(bytesCopied)), sha256));
+    QMessageBox::information(
+        this, i18n::t("Backup complete", "Резервная копия готова"),
+        i18n::t("%1 copied.\nSHA-256: %2", "Скопировано: %1.\nSHA-256: %2")
+            .arg(QLocale().formattedDataSize(static_cast<qint64>(bytesCopied)), sha256));
 }
 
 void DiskToolsView::onRestorePlanReady(bool ok, const QString &error, quint64 offset, quint64 length,
@@ -287,8 +303,9 @@ void DiskToolsView::onRestorePlanReady(bool ok, const QString &error, quint64 of
                                         bool targetIsSpecialDevice) {
     setBusy(false);
     if (!ok) {
-        appendLog(QStringLiteral("Restore plan failed: %1").arg(error));
-        QMessageBox::warning(this, QStringLiteral("Cannot restore"), error);
+        appendLog(i18n::t("Restore plan failed: %1", "Не удалось построить план восстановления: %1")
+                      .arg(error));
+        QMessageBox::warning(this, i18n::t("Cannot restore", "Восстановление невозможно"), error);
         return;
     }
     Q_UNUSED(inputSizeBytes);
@@ -296,12 +313,12 @@ void DiskToolsView::onRestorePlanReady(bool ok, const QString &error, quint64 of
     RestoreConfirmDialog dialog(pendingRestoreInputPath_, pendingRestoreTargetPath_, offset, length,
                                  inputSha256, targetIsSpecialDevice, this);
     if (dialog.exec() != QDialog::Accepted) {
-        appendLog(QStringLiteral("Restore cancelled."));
+        appendLog(i18n::t("Restore cancelled.", "Восстановление отменено."));
         return;
     }
 
     setBusy(true);
-    appendLog(QStringLiteral("--- Restoring: %1 -> %2 ---")
+    appendLog(i18n::t("--- Restoring: %1 -> %2 ---", "--- Восстановление: %1 -> %2 ---")
                   .arg(pendingRestoreInputPath_, pendingRestoreTargetPath_));
     QMetaObject::invokeMethod(worker_, "doPerformRestore", Qt::QueuedConnection,
                                Q_ARG(QString, pendingRestoreInputPath_),
@@ -319,17 +336,20 @@ void DiskToolsView::onRestoreFinished(bool ok, const QString &error, bool verifi
                                        const QString &expectedSha256, const QString &actualSha256) {
     setBusy(false);
     if (!ok) {
-        appendLog(QStringLiteral("*** RESTORE FAILED: %1 ***").arg(error));
-        QMessageBox::critical(this, QStringLiteral("Restore failed"), error);
+        appendLog(i18n::t("*** RESTORE FAILED: %1 ***", "*** ВОССТАНОВЛЕНИЕ НЕ УДАЛОСЬ: %1 ***").arg(error));
+        QMessageBox::critical(this, i18n::t("Restore failed", "Восстановление не удалось"), error);
         return;
     }
-    appendLog(QStringLiteral("Restore complete and verified (SHA-256 %1).").arg(actualSha256));
+    appendLog(i18n::t("Restore complete and verified (SHA-256 %1).",
+                       "Восстановление завершено и проверено (SHA-256 %1).")
+                  .arg(actualSha256));
     Q_UNUSED(verified);
     Q_UNUSED(expectedSha256);
-    QMessageBox::information(this, QStringLiteral("Restore complete"),
-                              QStringLiteral("Restore verified: written data matches the source "
-                                              "image byte-for-byte.\nSHA-256: %1")
-                                  .arg(actualSha256));
+    QMessageBox::information(
+        this, i18n::t("Restore complete", "Восстановление завершено"),
+        i18n::t("Restore verified: written data matches the source image byte-for-byte.\nSHA-256: %1",
+                "Проверено: записанные данные побайтово совпадают с исходным образом.\nSHA-256: %1")
+            .arg(actualSha256));
 }
 
 } // namespace gui

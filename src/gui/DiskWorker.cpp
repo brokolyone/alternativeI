@@ -9,6 +9,8 @@
 #include <utility>
 #include <vector>
 
+#include "i18n.h"
+
 namespace gui {
 
 namespace {
@@ -27,7 +29,7 @@ QString typeGuidName(const std::string &guid) {
     for (const auto &[typeGuid, name] : kKnown) {
         if (guid == typeGuid) return QString::fromLatin1(name);
     }
-    return QStringLiteral("Unknown");
+    return i18n::t("Unknown", "Неизвестно");
 }
 
 diskutil::RegionSpec makeRegionSpec(int regionKind, quint64 startLba, quint64 sectors) {
@@ -52,22 +54,27 @@ void DiskWorker::doInfo(const QString &path) {
 
     QString text;
     QTextStream out(&text);
-    out << "Path:  " << path << "\n";
-    out << "Size:  " << QLocale().formattedDataSize(static_cast<qint64>(device->sizeBytes())) << " ("
-        << device->sizeBytes() << " bytes)\n";
-    out << "Type:  " << (device->isSpecialDevice() ? "block device" : "regular file") << "\n\n";
+    out << i18n::t("Path:  ", "Путь:  ") << path << "\n";
+    out << i18n::t("Size:  ", "Размер:  ")
+        << QLocale().formattedDataSize(static_cast<qint64>(device->sizeBytes())) << " ("
+        << device->sizeBytes() << i18n::t(" bytes)\n", " байт)\n");
+    out << i18n::t("Type:  ", "Тип:  ")
+        << (device->isSpecialDevice() ? i18n::t("block device", "блочное устройство")
+                                       : i18n::t("regular file", "обычный файл"))
+        << "\n\n";
 
     const auto mbr = diskutil::readMbr(*device);
     if (!mbr.hasValidSignature) {
-        out << "MBR:   no valid 0x55AA signature - unpartitioned or unrecognized\n";
+        out << i18n::t("MBR:   no valid 0x55AA signature - unpartitioned or unrecognized\n",
+                        "MBR:   нет корректной сигнатуры 0x55AA — диск не размечен или не распознан\n");
         emit infoReady(true, {}, text);
         return;
     }
 
     if (mbr.looksLikeGptProtectiveMbr) {
-        out << "MBR:   protective (GPT disk)\n\n";
+        out << i18n::t("MBR:   protective (GPT disk)\n\n", "MBR:   защитный (диск GPT)\n\n");
     } else {
-        out << "MBR partitions:\n";
+        out << i18n::t("MBR partitions:\n", "Разделы MBR:\n");
         for (const auto &p : mbr.partitions) {
             out << QStringLiteral("  %1 type=0x%2  start_lba=%3  sectors=%4  (%5)\n")
                        .arg(p.active ? "*" : " ")
@@ -82,8 +89,10 @@ void DiskWorker::doInfo(const QString &path) {
 
     const auto gpt = diskutil::readGpt(*device);
     if (gpt && gpt->headerValid) {
-        out << "GPT disk GUID: " << QString::fromStdString(gpt->diskGuid) << "\n";
-        out << "GPT partitions (" << static_cast<int>(gpt->partitions.size()) << "):\n";
+        out << i18n::t("GPT disk GUID: ", "GUID диска GPT: ") << QString::fromStdString(gpt->diskGuid)
+            << "\n";
+        out << i18n::t("GPT partitions (", "Разделы GPT (") << static_cast<int>(gpt->partitions.size())
+            << "):\n";
         for (const auto &p : gpt->partitions) {
             const uint64_t sectors = p.endLba >= p.startLba ? (p.endLba - p.startLba + 1) : 0;
             out << QStringLiteral("  %1  %2  start=%3  end=%4  (%5)  %6\n")

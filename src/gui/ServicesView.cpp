@@ -9,6 +9,8 @@
 #include <QTableView>
 #include <QVBoxLayout>
 
+#include "i18n.h"
+
 namespace gui {
 
 ServicesView::ServicesView(QWidget *parent)
@@ -16,7 +18,7 @@ ServicesView::ServicesView(QWidget *parent)
     auto *layout = new QVBoxLayout(this);
 
     searchBox_ = new QLineEdit(this);
-    searchBox_->setPlaceholderText(QStringLiteral("Filter services..."));
+    searchBox_->setPlaceholderText(i18n::t("Filter services...", "Фильтр служб..."));
     layout->addWidget(searchBox_);
 
     model_ = new ServicesTableModel(this);
@@ -55,9 +57,9 @@ void ServicesView::showContextMenu(const QPoint &pos) {
     }
 
     QMenu menu(this);
-    QAction *startAction = menu.addAction(QStringLiteral("Start"));
-    QAction *stopAction = menu.addAction(QStringLiteral("Stop"));
-    QAction *restartAction = menu.addAction(QStringLiteral("Restart"));
+    QAction *startAction = menu.addAction(i18n::t("Start", "Запустить"));
+    QAction *stopAction = menu.addAction(i18n::t("Stop", "Остановить"));
+    QAction *restartAction = menu.addAction(i18n::t("Restart", "Перезапустить"));
 
     QAction *chosen = menu.exec(tableView_->viewport()->mapToGlobal(pos));
     if (chosen == startAction) {
@@ -81,9 +83,11 @@ void ServicesView::controlSelected(bool (core::IServiceManager::*action)(const s
         }
     }
     if (anyFailed) {
-        QMessageBox::warning(this, QStringLiteral("Service control"),
-                              QStringLiteral("One or more operations failed - this usually means "
-                                              "insufficient privileges (run elevated/as root)."));
+        QMessageBox::warning(this, i18n::t("Service control", "Управление службами"),
+                              i18n::t("One or more operations failed - this usually means "
+                                      "insufficient privileges (run elevated/as root).",
+                                      "Одна или несколько операций завершились неудачей — обычно это "
+                                      "означает нехватку прав (запустите от администратора/root)."));
     }
     refresh();
 }

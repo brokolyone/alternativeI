@@ -7,6 +7,8 @@
 #include <QVBoxLayout>
 #include <algorithm>
 
+#include "i18n.h"
+
 namespace gui {
 
 namespace {
@@ -28,7 +30,8 @@ QTableView *makeTableView(QAbstractItemModel *model, QWidget *parent) {
 ProcessDetailsDialog::ProcessDetailsDialog(core::IProcessProvider *provider, uint64_t pid,
                                             const QString &processName, QWidget *parent)
     : QDialog(parent), provider_(provider), pid_(pid) {
-    setWindowTitle(QStringLiteral("%1 (PID %2) Properties").arg(processName).arg(pid));
+    setWindowTitle(
+        i18n::t("%1 (PID %2) Properties", "%1 (PID %2) — Свойства").arg(processName).arg(pid));
     resize(800, 550);
 
     auto *layout = new QVBoxLayout(this);
@@ -36,24 +39,24 @@ ProcessDetailsDialog::ProcessDetailsDialog(core::IProcessProvider *provider, uin
     layout->addWidget(tabs);
 
     threadsModel_ = new ThreadsTableModel(this);
-    tabs->addTab(makeTableView(threadsModel_, this), QStringLiteral("Threads"));
+    tabs->addTab(makeTableView(threadsModel_, this), i18n::t("Threads", "Потоки"));
 
     modulesModel_ = new ModulesTableModel(this);
-    tabs->addTab(makeTableView(modulesModel_, this), QStringLiteral("Modules"));
+    tabs->addTab(makeTableView(modulesModel_, this), i18n::t("Modules", "Модули"));
 
     memoryModel_ = new MemoryRegionsTableModel(this);
-    tabs->addTab(makeTableView(memoryModel_, this), QStringLiteral("Memory"));
+    tabs->addTab(makeTableView(memoryModel_, this), i18n::t("Memory", "Память"));
 
     handlesModel_ = new HandlesTableModel(this);
-    tabs->addTab(makeTableView(handlesModel_, this), QStringLiteral("Handles"));
+    tabs->addTab(makeTableView(handlesModel_, this), i18n::t("Handles", "Хендлы"));
 
     networkModel_ = new NetworkTableModel(this);
-    tabs->addTab(makeTableView(networkModel_, this), QStringLiteral("Network"));
+    tabs->addTab(makeTableView(networkModel_, this), i18n::t("Network", "Сеть"));
 
     environmentView_ = new QPlainTextEdit(this);
     environmentView_->setReadOnly(true);
     environmentView_->setLineWrapMode(QPlainTextEdit::NoWrap);
-    tabs->addTab(environmentView_, QStringLiteral("Environment"));
+    tabs->addTab(environmentView_, i18n::t("Environment", "Окружение"));
 
     connect(&refreshTimer_, &QTimer::timeout, this, &ProcessDetailsDialog::refresh);
     refreshTimer_.start(2000);

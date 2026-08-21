@@ -2,6 +2,8 @@
 
 #include <QLocale>
 
+#include "i18n.h"
+
 namespace gui {
 
 namespace {
@@ -57,9 +59,9 @@ QVariant ThreadsTableModel::headerData(int section, Qt::Orientation orientation,
         return QAbstractTableModel::headerData(section, orientation, role);
     }
     switch (section) {
-        case ColumnTid: return QStringLiteral("TID");
-        case ColumnState: return QStringLiteral("State");
-        case ColumnPriority: return QStringLiteral("Priority");
+        case ColumnTid: return i18n::t("TID", "TID");
+        case ColumnState: return i18n::t("State", "Состояние");
+        case ColumnPriority: return i18n::t("Priority", "Приоритет");
         default: return {};
     }
 }
@@ -100,10 +102,10 @@ QVariant ModulesTableModel::headerData(int section, Qt::Orientation orientation,
         return QAbstractTableModel::headerData(section, orientation, role);
     }
     switch (section) {
-        case ColumnName: return QStringLiteral("Name");
-        case ColumnBase: return QStringLiteral("Base");
-        case ColumnSize: return QStringLiteral("Size");
-        case ColumnPath: return QStringLiteral("Path");
+        case ColumnName: return i18n::t("Name", "Имя");
+        case ColumnBase: return i18n::t("Base", "База");
+        case ColumnSize: return i18n::t("Size", "Размер");
+        case ColumnPath: return i18n::t("Path", "Путь");
         default: return {};
     }
 }
@@ -144,10 +146,10 @@ QVariant MemoryRegionsTableModel::headerData(int section, Qt::Orientation orient
         return QAbstractTableModel::headerData(section, orientation, role);
     }
     switch (section) {
-        case ColumnBase: return QStringLiteral("Base");
-        case ColumnSize: return QStringLiteral("Size");
-        case ColumnProtection: return QStringLiteral("Protection");
-        case ColumnMappedFile: return QStringLiteral("Mapped file");
+        case ColumnBase: return i18n::t("Base", "База");
+        case ColumnSize: return i18n::t("Size", "Размер");
+        case ColumnProtection: return i18n::t("Protection", "Защита");
+        case ColumnMappedFile: return i18n::t("Mapped file", "Отображённый файл");
         default: return {};
     }
 }
@@ -187,9 +189,9 @@ QVariant HandlesTableModel::headerData(int section, Qt::Orientation orientation,
         return QAbstractTableModel::headerData(section, orientation, role);
     }
     switch (section) {
-        case ColumnHandle: return QStringLiteral("Handle");
-        case ColumnType: return QStringLiteral("Type");
-        case ColumnName: return QStringLiteral("Name / target");
+        case ColumnHandle: return i18n::t("Handle", "Хендл");
+        case ColumnType: return i18n::t("Type", "Тип");
+        case ColumnName: return i18n::t("Name / target", "Имя / цель");
         default: return {};
     }
 }
@@ -232,12 +234,12 @@ QVariant NetworkTableModel::headerData(int section, Qt::Orientation orientation,
         return QAbstractTableModel::headerData(section, orientation, role);
     }
     switch (section) {
-        case ColumnProtocol: return QStringLiteral("Proto");
-        case ColumnLocalAddress: return QStringLiteral("Local address");
-        case ColumnLocalPort: return QStringLiteral("Local port");
-        case ColumnRemoteAddress: return QStringLiteral("Remote address");
-        case ColumnRemotePort: return QStringLiteral("Remote port");
-        case ColumnState: return QStringLiteral("State");
+        case ColumnProtocol: return i18n::t("Proto", "Протокол");
+        case ColumnLocalAddress: return i18n::t("Local address", "Локальный адрес");
+        case ColumnLocalPort: return i18n::t("Local port", "Локальный порт");
+        case ColumnRemoteAddress: return i18n::t("Remote address", "Удалённый адрес");
+        case ColumnRemotePort: return i18n::t("Remote port", "Удалённый порт");
+        case ColumnState: return i18n::t("State", "Состояние");
         default: return {};
     }
 }

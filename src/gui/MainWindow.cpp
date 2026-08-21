@@ -8,6 +8,7 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QMessageBox>
+#include <QSettings>
 #include <QStatusBar>
 #include <QTabWidget>
 #include <QToolBar>
@@ -15,23 +16,32 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "AboutDialog.h"
 #include "DiskToolsView.h"
 #include "PerformanceView.h"
 #include "ProcessDetailsDialog.h"
 #include "ServicesView.h"
+#include "SettingsDialog.h"
+#include "i18n.h"
 
 namespace gui {
 
+namespace {
+constexpr const char *kRefreshIntervalKey = "refreshIntervalMs";
+} // namespace
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), provider_(core::createDefaultProcessProvider()) {
-    setWindowTitle(QStringLiteral("AltTools — Process Manager"));
+    setWindowTitle(i18n::t("AltTools — Process Manager", "AltTools — Диспетчер процессов"));
     resize(1100, 700);
+
+    refreshIntervalMs_ = QSettings().value(QLatin1String(kRefreshIntervalKey), 1000).toInt();
 
     buildUi();
     buildToolbar();
 
     connect(&refreshTimer_, &QTimer::timeout, this, &MainWindow::refresh);
-    refreshTimer_.start(1000);
+    refreshTimer_.start(refreshIntervalMs_);
     refresh();
 }
 
@@ -40,7 +50,7 @@ void MainWindow::buildUi() {
     auto *layout = new QVBoxLayout(central);
 
     searchBox_ = new QLineEdit(central);
-    searchBox_->setPlaceholderText(QStringLiteral("Filter by name, PID or path..."));
+    searchBox_->setPlaceholderText(i18n::t("Filter by name, PID or path...", "Фильтр по имени, PID или пути..."));
     layout->addWidget(searchBox_);
 
     model_ = new ProcessTreeModel(this);
@@ -73,10 +83,10 @@ void MainWindow::buildUi() {
     layout->addWidget(treeView_);
 
     auto *tabs = new QTabWidget(this);
-    tabs->addTab(central, QStringLiteral("Processes"));
-    tabs->addTab(new PerformanceView(tabs), QStringLiteral("Performance"));
-    tabs->addTab(new ServicesView(tabs), QStringLiteral("Services"));
-    tabs->addTab(new DiskToolsView(tabs), QStringLiteral("Disk"));
+    tabs->addTab(central, i18n::t("Processes", "Процессы"));
+    tabs->addTab(new PerformanceView(tabs), i18n::t("Performance", "Производительность"));
+    tabs->addTab(new ServicesView(tabs), i18n::t("Services", "Службы"));
+    tabs->addTab(new DiskToolsView(tabs), i18n::t("Disk", "Диск"));
     setCentralWidget(tabs);
 
     statusLabel_ = new QLabel(this);
@@ -84,17 +94,41 @@ void MainWindow::buildUi() {
 }
 
 void MainWindow::buildToolbar() {
-    auto *toolbar = addToolBar(QStringLiteral("Main"));
+    auto *toolbar = addToolBar(i18n::t("Main", "Основная"));
     toolbar->setMovable(false);
 
-    auto *refreshAction = toolbar->addAction(QStringLiteral("Refresh"));
+    auto *refreshAction = toolbar->addAction(i18n::t("Refresh", "Обновить"));
     connect(refreshAction, &QAction::triggered, this, &MainWindow::refresh);
 
-    auto *propertiesAction = toolbar->addAction(QStringLiteral("Properties"));
+    auto *propertiesAction = toolbar->addAction(i18n::t("Properties", "Свойства"));
     connect(propertiesAction, &QAction::triggered, this, &MainWindow::openPropertiesForSelected);
 
-    auto *terminateAction = toolbar->addAction(QStringLiteral("Terminate"));
+    auto *terminateAction = toolbar->addAction(i18n::t("Terminate", "Завершить"));
     connect(terminateAction, &QAction::triggered, this, &MainWindow::terminateSelected);
+
+    toolbar->addSeparator();
+
+    auto *settingsAction = toolbar->addAction(i18n::t("Settings", "Настройки"));
+    connect(settingsAction, &QAction::triggered, this, &MainWindow::showSettingsDialog);
+
+    auto *aboutAction = toolbar->addAction(i18n::t("About", "О программе"));
+    connect(aboutAction, &QAction::triggered, this, &MainWindow::showAboutDialog);
+}
+
+void MainWindow::showAboutDialog() {
+    AboutDialog dialog(this);
+    dialog.exec();
+}
+
+void MainWindow::showSettingsDialog() {
+    SettingsDialog dialog(refreshIntervalMs_, this);
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    refreshIntervalMs_ = dialog.refreshIntervalMs();
+    QSettings().setValue(QLatin1String(kRefreshIntervalKey), refreshIntervalMs_);
+    refreshTimer_.setInterval(refreshIntervalMs_);
 }
 
 void MainWindow::refresh() {
@@ -112,7 +146,7 @@ void MainWindow::refresh() {
     auto processes = provider_->snapshot();
     const int count = static_cast<int>(processes.size());
     model_->setProcesses(std::move(processes));
-    statusLabel_->setText(QStringLiteral("Processes: %1").arg(count));
+    statusLabel_->setText(i18n::t("Processes: %1", "Процессов: %1").arg(count));
 
     if (!autoExpandDone_) {
         treeView_->expandAll();
@@ -171,17 +205,17 @@ void MainWindow::showProcessContextMenu(const QPoint &pos) {
     }
 
     QMenu menu(this);
-    QAction *propertiesAction = menu.addAction(QStringLiteral("Properties..."));
+    QAction *propertiesAction = menu.addAction(i18n::t("Properties...", "Свойства..."));
     menu.addSeparator();
-    QAction *terminateAction = menu.addAction(QStringLiteral("Terminate"));
+    QAction *terminateAction = menu.addAction(i18n::t("Terminate", "Завершить"));
 
-    QMenu *priorityMenu = menu.addMenu(QStringLiteral("Priority"));
-    QAction *realtimeAction = priorityMenu->addAction(QStringLiteral("Realtime"));
-    QAction *highAction = priorityMenu->addAction(QStringLiteral("High"));
-    QAction *aboveNormalAction = priorityMenu->addAction(QStringLiteral("Above normal"));
-    QAction *normalAction = priorityMenu->addAction(QStringLiteral("Normal"));
-    QAction *belowNormalAction = priorityMenu->addAction(QStringLiteral("Below normal"));
-    QAction *idleAction = priorityMenu->addAction(QStringLiteral("Idle"));
+    QMenu *priorityMenu = menu.addMenu(i18n::t("Priority", "Приоритет"));
+    QAction *realtimeAction = priorityMenu->addAction(i18n::t("Realtime", "Реального времени"));
+    QAction *highAction = priorityMenu->addAction(i18n::t("High", "Высокий"));
+    QAction *aboveNormalAction = priorityMenu->addAction(i18n::t("Above normal", "Выше среднего"));
+    QAction *normalAction = priorityMenu->addAction(i18n::t("Normal", "Средний"));
+    QAction *belowNormalAction = priorityMenu->addAction(i18n::t("Below normal", "Ниже среднего"));
+    QAction *idleAction = priorityMenu->addAction(i18n::t("Idle", "Простой"));
 
     QAction *chosen = menu.exec(treeView_->viewport()->mapToGlobal(pos));
     if (chosen == propertiesAction) {
@@ -209,8 +243,9 @@ void MainWindow::terminateSelected() {
         return;
     }
 
-    if (QMessageBox::question(this, QStringLiteral("Terminate process"),
-                               QStringLiteral("Terminate %1 selected process(es)?")
+    if (QMessageBox::question(this, i18n::t("Terminate process", "Завершение процесса"),
+                               i18n::t("Terminate %1 selected process(es)?",
+                                       "Завершить выбранные процессы (%1)?")
                                    .arg(selected.size())) != QMessageBox::Yes) {
         return;
     }

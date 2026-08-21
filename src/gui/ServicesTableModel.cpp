@@ -1,5 +1,7 @@
 #include "ServicesTableModel.h"
 
+#include "i18n.h"
+
 namespace gui {
 
 void ServicesTableModel::setServices(std::vector<core::ServiceInfo> services) {
@@ -43,10 +45,10 @@ QVariant ServicesTableModel::headerData(int section, Qt::Orientation orientation
         return QAbstractTableModel::headerData(section, orientation, role);
     }
     switch (section) {
-        case ColumnName: return QStringLiteral("Name");
-        case ColumnDisplayName: return QStringLiteral("Description");
-        case ColumnState: return QStringLiteral("State");
-        case ColumnStartType: return QStringLiteral("Start type");
+        case ColumnName: return i18n::t("Name", "Имя");
+        case ColumnDisplayName: return i18n::t("Description", "Описание");
+        case ColumnState: return i18n::t("State", "Состояние");
+        case ColumnStartType: return i18n::t("Start type", "Тип запуска");
         default: return {};
     }
 }

@@ -30,6 +30,8 @@ private slots:
     void onRowCollapsed(const QModelIndex &proxyIndex);
     void openPropertiesForSelected();
     void openPropertiesForIndex(const QModelIndex &proxyIndex);
+    void showAboutDialog();
+    void showSettingsDialog();
 
 private:
     void buildUi();
@@ -43,6 +45,7 @@ private:
     QLineEdit *searchBox_;
     QLabel *statusLabel_;
     QTimer refreshTimer_;
+    int refreshIntervalMs_ = 1000;
 
     QSet<uint64_t> expandedPids_;
     bool autoExpandDone_ = false;

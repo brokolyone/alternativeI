@@ -3,19 +3,21 @@
 #include <QLocale>
 #include <unordered_map>
 
+#include "i18n.h"
+
 namespace gui {
 
 namespace {
 
 QString priorityToString(core::ProcessPriority priority) {
     switch (priority) {
-        case core::ProcessPriority::Idle: return QStringLiteral("Idle");
-        case core::ProcessPriority::BelowNormal: return QStringLiteral("Below normal");
-        case core::ProcessPriority::Normal: return QStringLiteral("Normal");
-        case core::ProcessPriority::AboveNormal: return QStringLiteral("Above normal");
-        case core::ProcessPriority::High: return QStringLiteral("High");
-        case core::ProcessPriority::Realtime: return QStringLiteral("Realtime");
-        default: return QStringLiteral("Unknown");
+        case core::ProcessPriority::Idle: return i18n::t("Idle", "Простой");
+        case core::ProcessPriority::BelowNormal: return i18n::t("Below normal", "Ниже среднего");
+        case core::ProcessPriority::Normal: return i18n::t("Normal", "Средний");
+        case core::ProcessPriority::AboveNormal: return i18n::t("Above normal", "Выше среднего");
+        case core::ProcessPriority::High: return i18n::t("High", "Высокий");
+        case core::ProcessPriority::Realtime: return i18n::t("Realtime", "Реального времени");
+        default: return i18n::t("Unknown", "Неизвестно");
     }
 }
 
@@ -209,15 +211,15 @@ QVariant ProcessTreeModel::headerData(int section, Qt::Orientation orientation, 
     }
 
     switch (section) {
-        case ColumnName: return QStringLiteral("Name");
-        case ColumnPid: return QStringLiteral("PID");
-        case ColumnPpid: return QStringLiteral("PPID");
-        case ColumnCpu: return QStringLiteral("CPU");
-        case ColumnMemory: return QStringLiteral("Memory");
-        case ColumnThreads: return QStringLiteral("Threads");
-        case ColumnUser: return QStringLiteral("User");
-        case ColumnPriority: return QStringLiteral("Priority");
-        case ColumnPath: return QStringLiteral("Path");
+        case ColumnName: return i18n::t("Name", "Имя");
+        case ColumnPid: return i18n::t("PID", "PID");
+        case ColumnPpid: return i18n::t("PPID", "PPID");
+        case ColumnCpu: return i18n::t("CPU", "ЦП");
+        case ColumnMemory: return i18n::t("Memory", "Память");
+        case ColumnThreads: return i18n::t("Threads", "Потоки");
+        case ColumnUser: return i18n::t("User", "Пользователь");
+        case ColumnPriority: return i18n::t("Priority", "Приоритет");
+        case ColumnPath: return i18n::t("Path", "Путь");
         default: return {};
     }
 }
