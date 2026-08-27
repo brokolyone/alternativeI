@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 
 #include <QAction>
+#include <QApplication>
 #include <QHeaderView>
 #include <QItemSelection>
 #include <QItemSelectionModel>
@@ -132,6 +133,15 @@ void MainWindow::showSettingsDialog() {
 }
 
 void MainWindow::refresh() {
+    // Skip the periodic refresh while Ctrl is held: that's the modifier used
+    // to multi-select rows in the tree, and re-sorting/rebuilding the model
+    // out from under the pointer mid-Ctrl-click made it near-impossible to
+    // land a click on a specific row. Releasing Ctrl lets refreshes (at the
+    // interval configured in Settings) resume as normal.
+    if (QApplication::keyboardModifiers() & Qt::ControlModifier) {
+        return;
+    }
+
     QSet<uint64_t> selectedPids;
     if (treeView_->selectionModel()) {
         const auto selectedRows = treeView_->selectionModel()->selectedRows();
