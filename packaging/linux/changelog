@@ -1,3 +1,15 @@
+alttools (0.2.1-1) unstable; urgency=low
+
+  * Add "Settings" (language, process-list refresh interval) and "About"
+    buttons to the main toolbar.
+  * Full English/Russian UI localization, switchable from Settings
+    (takes effect after a restart, which Settings offers to do).
+  * Freeze the process list's periodic refresh while Ctrl is held, so
+    Ctrl-clicking to multi-select no longer gets rows reordered out from
+    under the pointer.
+
+ -- AlternativeI Project <unset@example.invalid>  Thu, 27 Aug 2026 12:00:00 +0000
+
 alttools (0.1.0-1) unstable; urgency=low
 
   * Initial release: process tree view, per-process properties dialog

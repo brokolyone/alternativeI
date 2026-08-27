@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(AltTools VERSION 0.1.0 LANGUAGES CXX)
+project(AltTools VERSION 0.2.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -216,8 +216,8 @@ if(UNIX AND NOT WIN32)
     set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON) # auto-computes libqt6widgets6 etc. via dpkg-shlibdeps
     set(CPACK_DEBIAN_FILE_NAME "DEB-DEFAULT") # proper name_version_arch.deb naming
-    # "-1" packaging revision (upstream 0.1.0, Debian revision 1) marks
-    # this as a non-native package to lintian - a bare "0.1.0" reads as
+    # "-1" packaging revision (upstream version, Debian revision 1) marks
+    # this as a non-native package to lintian - a bare version reads as
     # "the upstream project IS this Debian package" and demands a full
     # debian/changelog this project doesn't have.
     set(CPACK_DEBIAN_PACKAGE_RELEASE "1")

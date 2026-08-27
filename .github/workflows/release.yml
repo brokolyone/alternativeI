@@ -9,7 +9,7 @@ on:
       tag:
         description: "Release tag to publish (created if it doesn't exist yet)"
         required: false
-        default: "v0.1.0"
+        default: "v0.2.1"
 
 jobs:
   build-linux-deb:
