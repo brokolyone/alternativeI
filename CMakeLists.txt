@@ -211,7 +211,11 @@ set(CPACK_PACKAGE_CONTACT "AlternativeI Project <unset@example.invalid>")
 set(CPACK_STRIP_FILES TRUE)
 
 if(UNIX AND NOT WIN32)
-    set(CPACK_GENERATOR "DEB")
+    # DEB is the installed package; TGZ is the same staged tree (still
+    # nested under usr/ - see CPACK_PACKAGING_INSTALL_PREFIX below) handed
+    # out as a portable tarball for anyone who'd rather extract-and-run
+    # than involve dpkg.
+    set(CPACK_GENERATOR "DEB;TGZ")
     set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
     set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON) # auto-computes libqt6widgets6 etc. via dpkg-shlibdeps
@@ -222,12 +226,20 @@ if(UNIX AND NOT WIN32)
     # debian/changelog this project doesn't have.
     set(CPACK_DEBIAN_PACKAGE_RELEASE "1")
 elseif(WIN32)
-    set(CPACK_GENERATOR "NSIS")
+    # NSIS is the installer; ZIP is the same flat install tree the
+    # installer wraps, archived directly instead - "extract and run", no
+    # installer/uninstaller/PATH changes, for a portable option alongside it.
+    set(CPACK_GENERATOR "NSIS;ZIP")
     set(CPACK_NSIS_PACKAGE_NAME "AltTools")
     set(CPACK_NSIS_DISPLAY_NAME "AltTools")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
     set(CPACK_NSIS_MODIFY_PATH ON) # offers to add diskutil.exe to PATH
     set(CPACK_PACKAGE_EXECUTABLES "alttools" "AltTools")
 endif()
+
+# Gives the portable archive generators (ZIP/TGZ) a "-portable" filename
+# distinct from the installer/.deb, which otherwise share the same
+# CPACK_PACKAGE_FILE_NAME base - see packaging/CPackProjectConfig.cmake.
+set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_SOURCE_DIR}/packaging/CPackProjectConfig.cmake")
 
 include(CPack)

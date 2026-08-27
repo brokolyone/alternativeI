@@ -28,15 +28,20 @@ jobs:
       - name: Build
         run: cmake --build build
 
-      - name: Package .deb
+      # No -G flag: builds every generator listed in CMakeLists.txt's
+      # CPACK_GENERATOR for this platform (DEB *and* the portable TGZ),
+      # instead of only the installable .deb.
+      - name: Package .deb and portable tarball
         working-directory: build
-        run: cpack -G DEB
+        run: cpack
 
-      - name: Upload .deb artifact
+      - name: Upload Linux packages artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linux-deb
-          path: build/*.deb
+          name: linux-packages
+          path: |
+            build/*.deb
+            build/*.tar.gz
 
   build-windows-installer:
     runs-on: windows-latest
@@ -94,19 +99,24 @@ jobs:
           choco install nsis -y
           echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
 
-      - name: Package NSIS installer
+      # No -G flag: builds every generator listed in CMakeLists.txt's
+      # CPACK_GENERATOR for this platform (the NSIS installer *and* the
+      # portable ZIP), instead of only the installer.
+      - name: Package NSIS installer and portable zip
         working-directory: build
-        run: cpack -G NSIS
+        run: cpack
         timeout-minutes: 6
 
-      - name: Upload installer artifact
+      - name: Upload Windows packages artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-installer
-          # Narrow to the CPack-produced installer only: build/*.exe would
-          # also match the raw alttools.exe/diskutil.exe build outputs
-          # sitting next to it, which aren't installers.
-          path: build/alttools-*-win64.exe
+          name: windows-packages
+          # Narrow to the CPack-produced installer/archive: a bare
+          # build/*.exe would also match the raw alttools.exe/diskutil.exe
+          # build outputs sitting next to them, which aren't packages.
+          path: |
+            build/alttools-*-win64.exe
+            build/alttools-*-win64-portable.zip
 
   publish-release:
     needs: [build-linux-deb, build-windows-installer]
@@ -128,6 +138,8 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
-            artifacts/linux-deb/*.deb
-            artifacts/windows-installer/*.exe
+            artifacts/linux-packages/*.deb
+            artifacts/linux-packages/*.tar.gz
+            artifacts/windows-packages/*.exe
+            artifacts/windows-packages/*.zip
           generate_release_notes: true
