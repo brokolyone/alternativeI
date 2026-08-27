@@ -37,10 +37,8 @@ AboutDialog::AboutDialog(QWidget *parent) : QDialog(parent) {
     layout->addWidget(descriptionLabel);
 
     auto *licenseLabel = new QLabel(
-        i18n::t("License: not yet chosen — all rights reserved by the project's contributors "
-                "pending that decision.",
-                "Лицензия: пока не выбрана — все права принадлежат авторам проекта до её "
-                "определения."),
+        i18n::t("License: Proprietary. All rights reserved.",
+                "Лицензия: проприетарное ПО. Все права защищены."),
         this);
     licenseLabel->setWordWrap(true);
     layout->addWidget(licenseLabel);
