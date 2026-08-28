@@ -102,6 +102,17 @@ trust in the whole project. This is a separate, cheaper certificate than
 the EV cert the kernel driver needs (see `docs/windows-driver.md`'s
 signing section) and can happen well before the driver work does.
 
+This isn't hypothetical: the unsigned `v0.2.1` build was flagged by Windows
+Defender as `Trojan:Win32/Sabsik.FL.A!ml`, a cloud ML heuristic (not a
+signature match) triggered by the combination of zero reputation (fresh
+unsigned binary) and the app's inherently "hacktool-shaped" behavior
+(process enumeration/termination, service control, raw `\\.\PhysicalDriveN`
+access in `diskutil`) — see the README's "Известная проблема: Windows
+Defender..." section for the user-facing explanation and workarounds
+(submit-for-analysis, verify hash, exclusion). Signing raises reputation
+immediately (OV) or instantly (EV) and is the only fix that doesn't rely on
+each user manually working around a detection.
+
 ## What to actually build first
 
 1. CMake `install()` rules for both targets (currently missing entirely —
