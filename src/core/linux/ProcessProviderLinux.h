@@ -19,6 +19,8 @@ public:
     bool setPriority(uint64_t pid, ProcessPriority priority) override;
     bool suspend(uint64_t pid) override;
     bool resume(uint64_t pid) override;
+    uint64_t affinityMask(uint64_t pid) override;
+    bool setAffinityMask(uint64_t pid, uint64_t mask) override;
 
     std::vector<ThreadInfo> threads(uint64_t pid) override;
     std::vector<ModuleInfo> modules(uint64_t pid) override;

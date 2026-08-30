@@ -26,6 +26,12 @@ public:
     virtual bool suspend(uint64_t pid) = 0;
     virtual bool resume(uint64_t pid) = 0;
 
+    // CPU affinity as a bitmask (bit N = core N eligible to run this
+    // process). Only the first 64 cores are addressable through this
+    // interface. Returns 0 from affinityMask() if unsupported/unknown.
+    virtual uint64_t affinityMask(uint64_t pid) = 0;
+    virtual bool setAffinityMask(uint64_t pid, uint64_t mask) = 0;
+
     // Per-process detail views, queried on demand (e.g. when a properties
     // dialog is opened) rather than on every snapshot() poll, since they
     // are more expensive to gather. Each returns an empty vector if the

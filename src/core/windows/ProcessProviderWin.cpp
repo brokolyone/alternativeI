@@ -363,6 +363,28 @@ bool ProcessProviderWin::resume(uint64_t pid) {
     return ok;
 }
 
+uint64_t ProcessProviderWin::affinityMask(uint64_t pid) {
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
+    if (process == nullptr) {
+        return 0;
+    }
+    DWORD_PTR processMask = 0;
+    DWORD_PTR systemMask = 0;
+    const bool ok = GetProcessAffinityMask(process, &processMask, &systemMask) != 0;
+    CloseHandle(process);
+    return ok ? static_cast<uint64_t>(processMask) : 0;
+}
+
+bool ProcessProviderWin::setAffinityMask(uint64_t pid, uint64_t mask) {
+    HANDLE process = OpenProcess(PROCESS_SET_INFORMATION, FALSE, static_cast<DWORD>(pid));
+    if (process == nullptr) {
+        return false;
+    }
+    const bool ok = SetProcessAffinityMask(process, static_cast<DWORD_PTR>(mask)) != 0;
+    CloseHandle(process);
+    return ok;
+}
+
 std::vector<ThreadInfo> ProcessProviderWin::threads(uint64_t pid) {
     std::vector<ThreadInfo> result;
 

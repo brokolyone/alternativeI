@@ -1,3 +1,12 @@
+alttools (0.3.2-1) unstable; urgency=low
+
+  * Add per-process CPU affinity (Set Affinity... dialog, one checkbox
+    per core).
+  * Add "Open File Location" and "Copy Process Info" to the process
+    context menu.
+
+ -- AlternativeI Project <unset@example.invalid>  Thu, 27 Aug 2026 12:00:00 +0000
+
 alttools (0.3.1-1) unstable; urgency=low
 
   * Add Suspend/Resume for a process (Linux SIGSTOP/SIGCONT, Windows

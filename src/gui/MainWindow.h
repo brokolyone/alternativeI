@@ -28,6 +28,9 @@ private slots:
     void terminateSelectedTrees();
     void suspendSelected();
     void resumeSelected();
+    void setAffinityForSelected();
+    void openFileLocationForSelected();
+    void copyProcessInfoForSelected();
     void setPrioritySelected(core::ProcessPriority priority);
     void onRowExpanded(const QModelIndex &proxyIndex);
     void onRowCollapsed(const QModelIndex &proxyIndex);

@@ -2,6 +2,9 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QClipboard>
+#include <QDesktopServices>
+#include <QFileInfo>
 #include <QHeaderView>
 #include <QItemSelection>
 #include <QItemSelectionModel>
@@ -14,10 +17,13 @@
 #include <QTabWidget>
 #include <QToolBar>
 #include <QTreeView>
+#include <QUrl>
 #include <QVBoxLayout>
 #include <QWidget>
+#include <vector>
 
 #include "AboutDialog.h"
+#include "AffinityDialog.h"
 #include "DiskToolsView.h"
 #include "PerformanceView.h"
 #include "ProcessDetailsDialog.h"
@@ -222,6 +228,10 @@ void MainWindow::showProcessContextMenu(const QPoint &pos) {
     menu.addSeparator();
     QAction *suspendAction = menu.addAction(i18n::t("Suspend", "Приостановить"));
     QAction *resumeAction = menu.addAction(i18n::t("Resume", "Возобновить"));
+    QAction *affinityAction = menu.addAction(i18n::t("Set Affinity...", "Привязка к процессорам..."));
+    menu.addSeparator();
+    QAction *openLocationAction = menu.addAction(i18n::t("Open File Location", "Открыть расположение файла"));
+    QAction *copyInfoAction = menu.addAction(i18n::t("Copy Process Info", "Копировать информацию о процессе"));
 
     QMenu *priorityMenu = menu.addMenu(i18n::t("Priority", "Приоритет"));
     QAction *realtimeAction = priorityMenu->addAction(i18n::t("Realtime", "Реального времени"));
@@ -242,6 +252,12 @@ void MainWindow::showProcessContextMenu(const QPoint &pos) {
         suspendSelected();
     } else if (chosen == resumeAction) {
         resumeSelected();
+    } else if (chosen == affinityAction) {
+        setAffinityForSelected();
+    } else if (chosen == openLocationAction) {
+        openFileLocationForSelected();
+    } else if (chosen == copyInfoAction) {
+        copyProcessInfoForSelected();
     } else if (chosen == realtimeAction) {
         setPrioritySelected(core::ProcessPriority::Realtime);
     } else if (chosen == highAction) {
@@ -336,6 +352,76 @@ void MainWindow::resumeSelected() {
         }
     }
     refresh();
+}
+
+void MainWindow::setAffinityForSelected() {
+    const QModelIndexList selected = treeView_->selectionModel()->selectedRows();
+    if (selected.isEmpty()) {
+        return;
+    }
+
+    std::vector<uint64_t> pids;
+    for (const QModelIndex &proxyIndex : selected) {
+        const QModelIndex sourceIndex = proxyModel_->mapToSource(proxyIndex);
+        if (const core::ProcessInfo *info = model_->processForIndex(sourceIndex)) {
+            pids.push_back(info->pid);
+        }
+    }
+    if (pids.empty()) {
+        return;
+    }
+
+    // Pre-check the first selected process's current mask; applied to
+    // every selected process on OK (PH itself only supports a single
+    // process at a time here - this is a deliberate superset).
+    AffinityDialog dialog(provider_->affinityMask(pids.front()), this);
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    const uint64_t mask = dialog.selectedMask();
+    for (uint64_t pid : pids) {
+        provider_->setAffinityMask(pid, mask);
+    }
+}
+
+void MainWindow::openFileLocationForSelected() {
+    const QModelIndexList selected = treeView_->selectionModel()->selectedRows();
+    if (selected.isEmpty()) {
+        return;
+    }
+    const QModelIndex sourceIndex = proxyModel_->mapToSource(selected.first());
+    const core::ProcessInfo *info = model_->processForIndex(sourceIndex);
+    if (info == nullptr || info->exePath.empty()) {
+        return;
+    }
+
+    const QFileInfo fileInfo(QString::fromStdString(info->exePath));
+    QDesktopServices::openUrl(QUrl::fromLocalFile(fileInfo.absolutePath()));
+}
+
+void MainWindow::copyProcessInfoForSelected() {
+    const QModelIndexList selected = treeView_->selectionModel()->selectedRows();
+    if (selected.isEmpty()) {
+        return;
+    }
+
+    QString text;
+    for (const QModelIndex &proxyIndex : selected) {
+        const QModelIndex sourceIndex = proxyModel_->mapToSource(proxyIndex);
+        const core::ProcessInfo *info = model_->processForIndex(sourceIndex);
+        if (info == nullptr) {
+            continue;
+        }
+        text += QStringLiteral("%1\tPID %2\tPPID %3\t%4\t%5\n")
+                    .arg(QString::fromStdString(info->name))
+                    .arg(info->pid)
+                    .arg(info->ppid)
+                    .arg(QString::fromStdString(info->user), QString::fromStdString(info->exePath));
+    }
+    if (!text.isEmpty()) {
+        QApplication::clipboard()->setText(text);
+    }
 }
 
 void MainWindow::openPropertiesForSelected() {

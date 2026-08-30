@@ -2,6 +2,7 @@
 
 #include <dirent.h>
 #include <pwd.h>
+#include <sched.h>
 #include <signal.h>
 #include <sys/resource.h>
 #include <unistd.h>
@@ -366,6 +367,32 @@ bool ProcessProviderLinux::suspend(uint64_t pid) {
 
 bool ProcessProviderLinux::resume(uint64_t pid) {
     return kill(static_cast<pid_t>(pid), SIGCONT) == 0;
+}
+
+uint64_t ProcessProviderLinux::affinityMask(uint64_t pid) {
+    cpu_set_t set;
+    CPU_ZERO(&set);
+    if (sched_getaffinity(static_cast<pid_t>(pid), sizeof(set), &set) != 0) {
+        return 0;
+    }
+    uint64_t mask = 0;
+    for (int cpu = 0; cpu < 64 && cpu < CPU_SETSIZE; ++cpu) {
+        if (CPU_ISSET(cpu, &set)) {
+            mask |= (uint64_t{1} << cpu);
+        }
+    }
+    return mask;
+}
+
+bool ProcessProviderLinux::setAffinityMask(uint64_t pid, uint64_t mask) {
+    cpu_set_t set;
+    CPU_ZERO(&set);
+    for (int cpu = 0; cpu < 64 && cpu < CPU_SETSIZE; ++cpu) {
+        if (mask & (uint64_t{1} << cpu)) {
+            CPU_SET(cpu, &set);
+        }
+    }
+    return sched_setaffinity(static_cast<pid_t>(pid), sizeof(set), &set) == 0;
 }
 
 std::vector<ThreadInfo> ProcessProviderLinux::threads(uint64_t pid) {
