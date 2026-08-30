@@ -122,6 +122,27 @@ QModelIndex ProcessTreeModel::indexForPid(uint64_t pid) const {
     return QModelIndex();
 }
 
+void ProcessTreeModel::collectDescendants(Node *node, std::vector<uint64_t> *out) const {
+    for (const auto &child : node->children) {
+        out->push_back(child->info.pid);
+        collectDescendants(child.get(), out);
+    }
+}
+
+std::vector<uint64_t> ProcessTreeModel::descendantPids(uint64_t pid) const {
+    std::vector<uint64_t> result;
+    const QModelIndex index = indexForPid(pid);
+    // nodeFromIndex() treats an invalid index as "the root" - guard against
+    // that here, or a not-found pid would collect the entire process tree.
+    if (!index.isValid()) {
+        return result;
+    }
+    if (Node *node = nodeFromIndex(index)) {
+        collectDescendants(node, &result);
+    }
+    return result;
+}
+
 QModelIndex ProcessTreeModel::index(int row, int column, const QModelIndex &parent) const {
     if (!hasIndex(row, column, parent)) {
         return QModelIndex();

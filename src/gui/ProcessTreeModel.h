@@ -40,6 +40,10 @@ public:
     // view can restore expansion/selection state across refreshes.
     QModelIndex indexForPid(uint64_t pid) const;
 
+    // All PIDs below this one in the tree (children, grandchildren, ...),
+    // for "terminate process tree" - excludes pid itself.
+    std::vector<uint64_t> descendantPids(uint64_t pid) const;
+
     QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override;
     QModelIndex parent(const QModelIndex &child) const override;
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
@@ -56,6 +60,7 @@ private:
 
     Node *nodeFromIndex(const QModelIndex &index) const;
     bool findPid(Node *node, uint64_t pid, QModelIndex ancestorIndex, QModelIndex *outIndex) const;
+    void collectDescendants(Node *node, std::vector<uint64_t> *out) const;
 
     std::unique_ptr<Node> root_;
 };

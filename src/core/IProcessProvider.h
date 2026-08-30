@@ -21,6 +21,11 @@ public:
     virtual bool terminate(uint64_t pid) = 0;
     virtual bool setPriority(uint64_t pid, ProcessPriority priority) = 0;
 
+    // Freeze/unfreeze all of a process's threads without terminating it -
+    // Linux: SIGSTOP/SIGCONT: Windows: NtSuspendProcess/NtResumeProcess.
+    virtual bool suspend(uint64_t pid) = 0;
+    virtual bool resume(uint64_t pid) = 0;
+
     // Per-process detail views, queried on demand (e.g. when a properties
     // dialog is opened) rather than on every snapshot() poll, since they
     // are more expensive to gather. Each returns an empty vector if the

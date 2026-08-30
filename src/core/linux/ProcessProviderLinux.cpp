@@ -360,6 +360,14 @@ bool ProcessProviderLinux::setPriority(uint64_t pid, ProcessPriority priority) {
     return setpriority(PRIO_PROCESS, static_cast<id_t>(pid), priorityEnumToNiceValue(priority)) == 0;
 }
 
+bool ProcessProviderLinux::suspend(uint64_t pid) {
+    return kill(static_cast<pid_t>(pid), SIGSTOP) == 0;
+}
+
+bool ProcessProviderLinux::resume(uint64_t pid) {
+    return kill(static_cast<pid_t>(pid), SIGCONT) == 0;
+}
+
 std::vector<ThreadInfo> ProcessProviderLinux::threads(uint64_t pid) {
     std::vector<ThreadInfo> result;
 

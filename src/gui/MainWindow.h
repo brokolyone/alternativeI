@@ -25,6 +25,9 @@ private slots:
     void refresh();
     void showProcessContextMenu(const QPoint &pos);
     void terminateSelected();
+    void terminateSelectedTrees();
+    void suspendSelected();
+    void resumeSelected();
     void setPrioritySelected(core::ProcessPriority priority);
     void onRowExpanded(const QModelIndex &proxyIndex);
     void onRowCollapsed(const QModelIndex &proxyIndex);

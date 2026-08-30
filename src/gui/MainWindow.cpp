@@ -218,6 +218,10 @@ void MainWindow::showProcessContextMenu(const QPoint &pos) {
     QAction *propertiesAction = menu.addAction(i18n::t("Properties...", "Свойства..."));
     menu.addSeparator();
     QAction *terminateAction = menu.addAction(i18n::t("Terminate", "Завершить"));
+    QAction *terminateTreeAction = menu.addAction(i18n::t("Terminate process tree", "Завершить дерево процессов"));
+    menu.addSeparator();
+    QAction *suspendAction = menu.addAction(i18n::t("Suspend", "Приостановить"));
+    QAction *resumeAction = menu.addAction(i18n::t("Resume", "Возобновить"));
 
     QMenu *priorityMenu = menu.addMenu(i18n::t("Priority", "Приоритет"));
     QAction *realtimeAction = priorityMenu->addAction(i18n::t("Realtime", "Реального времени"));
@@ -232,6 +236,12 @@ void MainWindow::showProcessContextMenu(const QPoint &pos) {
         openPropertiesForIndex(index);
     } else if (chosen == terminateAction) {
         terminateSelected();
+    } else if (chosen == terminateTreeAction) {
+        terminateSelectedTrees();
+    } else if (chosen == suspendAction) {
+        suspendSelected();
+    } else if (chosen == resumeAction) {
+        resumeSelected();
     } else if (chosen == realtimeAction) {
         setPrioritySelected(core::ProcessPriority::Realtime);
     } else if (chosen == highAction) {
@@ -264,6 +274,65 @@ void MainWindow::terminateSelected() {
         const QModelIndex sourceIndex = proxyModel_->mapToSource(proxyIndex);
         if (const core::ProcessInfo *info = model_->processForIndex(sourceIndex)) {
             provider_->terminate(info->pid);
+        }
+    }
+    refresh();
+}
+
+void MainWindow::terminateSelectedTrees() {
+    const QModelIndexList selected = treeView_->selectionModel()->selectedRows();
+    if (selected.isEmpty()) {
+        return;
+    }
+
+    // Snapshot pid + all descendants for every selected row *before*
+    // terminating anything - killing a parent first would otherwise orphan
+    // its children in the tree we're about to re-walk mid-loop.
+    QSet<uint64_t> pids;
+    for (const QModelIndex &proxyIndex : selected) {
+        const QModelIndex sourceIndex = proxyModel_->mapToSource(proxyIndex);
+        if (const core::ProcessInfo *info = model_->processForIndex(sourceIndex)) {
+            pids.insert(info->pid);
+            for (uint64_t descendant : model_->descendantPids(info->pid)) {
+                pids.insert(descendant);
+            }
+        }
+    }
+    if (pids.isEmpty()) {
+        return;
+    }
+
+    if (QMessageBox::question(
+            this, i18n::t("Terminate process tree", "Завершение дерева процессов"),
+            i18n::t("Terminate %1 process(es) (selected plus all children)?",
+                    "Завершить %1 процесс(ов) (выбранные и все их дочерние)?")
+                .arg(pids.size())) != QMessageBox::Yes) {
+        return;
+    }
+
+    for (uint64_t pid : std::as_const(pids)) {
+        provider_->terminate(pid);
+    }
+    refresh();
+}
+
+void MainWindow::suspendSelected() {
+    const QModelIndexList selected = treeView_->selectionModel()->selectedRows();
+    for (const QModelIndex &proxyIndex : selected) {
+        const QModelIndex sourceIndex = proxyModel_->mapToSource(proxyIndex);
+        if (const core::ProcessInfo *info = model_->processForIndex(sourceIndex)) {
+            provider_->suspend(info->pid);
+        }
+    }
+    refresh();
+}
+
+void MainWindow::resumeSelected() {
+    const QModelIndexList selected = treeView_->selectionModel()->selectedRows();
+    for (const QModelIndex &proxyIndex : selected) {
+        const QModelIndex sourceIndex = proxyModel_->mapToSource(proxyIndex);
+        if (const core::ProcessInfo *info = model_->processForIndex(sourceIndex)) {
+            provider_->resume(info->pid);
         }
     }
     refresh();

@@ -74,6 +74,25 @@ NtQueryObjectFn resolveNtQueryObject() {
     return fn;
 }
 
+// --- NtSuspendProcess/NtResumeProcess ---------------------------------
+// Undocumented but stable since XP (same pair Process Hacker uses for its
+// Suspend/Resume actions); not declared in any public SDK header.
+
+typedef NTSTATUS(NTAPI *NtSuspendProcessFn)(HANDLE ProcessHandle);
+typedef NTSTATUS(NTAPI *NtResumeProcessFn)(HANDLE ProcessHandle);
+
+NtSuspendProcessFn resolveNtSuspendProcess() {
+    static NtSuspendProcessFn fn = reinterpret_cast<NtSuspendProcessFn>(
+        GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtSuspendProcess"));
+    return fn;
+}
+
+NtResumeProcessFn resolveNtResumeProcess() {
+    static NtResumeProcessFn fn = reinterpret_cast<NtResumeProcessFn>(
+        GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtResumeProcess"));
+    return fn;
+}
+
 std::string tcpStateToStringWin(DWORD state) {
     switch (state) {
         case 1: return "CLOSED";
@@ -312,6 +331,34 @@ bool ProcessProviderWin::setPriority(uint64_t pid, ProcessPriority priority) {
         return false;
     }
     const bool ok = SetPriorityClass(process, priorityEnumToClass(priority)) != 0;
+    CloseHandle(process);
+    return ok;
+}
+
+bool ProcessProviderWin::suspend(uint64_t pid) {
+    auto ntSuspendProcess = resolveNtSuspendProcess();
+    if (ntSuspendProcess == nullptr) {
+        return false;
+    }
+    HANDLE process = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, static_cast<DWORD>(pid));
+    if (process == nullptr) {
+        return false;
+    }
+    const bool ok = ntSuspendProcess(process) >= 0; // NT_SUCCESS: high bit of NTSTATUS clear
+    CloseHandle(process);
+    return ok;
+}
+
+bool ProcessProviderWin::resume(uint64_t pid) {
+    auto ntResumeProcess = resolveNtResumeProcess();
+    if (ntResumeProcess == nullptr) {
+        return false;
+    }
+    HANDLE process = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, static_cast<DWORD>(pid));
+    if (process == nullptr) {
+        return false;
+    }
+    const bool ok = ntResumeProcess(process) >= 0;
     CloseHandle(process);
     return ok;
 }

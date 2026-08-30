@@ -1,3 +1,12 @@
+alttools (0.3.1-1) unstable; urgency=low
+
+  * Add Suspend/Resume for a process (Linux SIGSTOP/SIGCONT, Windows
+    NtSuspendProcess/NtResumeProcess).
+  * Add "Terminate process tree" - terminates a selected process together
+    with all of its descendants.
+
+ -- AlternativeI Project <unset@example.invalid>  Thu, 27 Aug 2026 12:00:00 +0000
+
 alttools (0.2.1-1) unstable; urgency=low
 
   * Add "Settings" (language, process-list refresh interval) and "About"
