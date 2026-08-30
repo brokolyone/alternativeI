@@ -1,5 +1,6 @@
 #include "ProcessTreeModel.h"
 
+#include <QColor>
 #include <QLocale>
 #include <unordered_map>
 
@@ -114,6 +115,25 @@ bool ProcessTreeModel::findPid(Node *node, uint64_t pid, QModelIndex ancestorInd
     return false;
 }
 
+void ProcessTreeModel::setHighlightedPids(QSet<uint64_t> pids) {
+    highlightedPids_ = std::move(pids);
+}
+
+void ProcessTreeModel::collectAll(Node *node, std::vector<const core::ProcessInfo *> *out) const {
+    for (const auto &child : node->children) {
+        out->push_back(&child->info);
+        collectAll(child.get(), out);
+    }
+}
+
+std::vector<const core::ProcessInfo *> ProcessTreeModel::allProcesses() const {
+    std::vector<const core::ProcessInfo *> result;
+    if (root_) {
+        collectAll(root_.get(), &result);
+    }
+    return result;
+}
+
 QModelIndex ProcessTreeModel::indexForPid(uint64_t pid) const {
     QModelIndex result;
     if (root_ && findPid(root_.get(), pid, QModelIndex(), &result)) {
@@ -206,6 +226,13 @@ QVariant ProcessTreeModel::data(const QModelIndex &index, int role) const {
             default:
                 return QVariant(Qt::AlignLeft | Qt::AlignVCenter);
         }
+    }
+
+    if (role == Qt::BackgroundRole) {
+        if (highlightedPids_.contains(proc->pid)) {
+            return QColor(150, 230, 150); // Process-Hacker-style "new process" flash
+        }
+        return {};
     }
 
     if (role != Qt::DisplayRole) {

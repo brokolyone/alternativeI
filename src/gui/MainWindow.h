@@ -38,6 +38,7 @@ private slots:
     void openPropertiesForIndex(const QModelIndex &proxyIndex);
     void showAboutDialog();
     void showSettingsDialog();
+    void exportProcessListToCsv();
 
 private:
     void buildUi();
@@ -54,6 +55,7 @@ private:
     int refreshIntervalMs_ = 1000;
 
     QSet<uint64_t> expandedPids_;
+    QSet<uint64_t> knownPids_;
     bool autoExpandDone_ = false;
 };
 

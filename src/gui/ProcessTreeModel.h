@@ -36,6 +36,11 @@ public:
     void setProcesses(std::vector<core::ProcessInfo> processes);
     const core::ProcessInfo *processForIndex(const QModelIndex &index) const;
 
+    // Rows for these PIDs paint with a highlight background on the next
+    // data() query - MainWindow calls this with "just appeared since the
+    // last refresh" each poll, Process-Hacker-style new-process flashing.
+    void setHighlightedPids(QSet<uint64_t> pids);
+
     // Finds the index of the row showing this PID after a rebuild, so the
     // view can restore expansion/selection state across refreshes.
     QModelIndex indexForPid(uint64_t pid) const;
@@ -43,6 +48,10 @@ public:
     // All PIDs below this one in the tree (children, grandchildren, ...),
     // for "terminate process tree" - excludes pid itself.
     std::vector<uint64_t> descendantPids(uint64_t pid) const;
+
+    // Every process currently in the tree, for CSV export. Pointers are
+    // only valid until the next setProcesses() call.
+    std::vector<const core::ProcessInfo *> allProcesses() const;
 
     QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override;
     QModelIndex parent(const QModelIndex &child) const override;
@@ -61,8 +70,10 @@ private:
     Node *nodeFromIndex(const QModelIndex &index) const;
     bool findPid(Node *node, uint64_t pid, QModelIndex ancestorIndex, QModelIndex *outIndex) const;
     void collectDescendants(Node *node, std::vector<uint64_t> *out) const;
+    void collectAll(Node *node, std::vector<const core::ProcessInfo *> *out) const;
 
     std::unique_ptr<Node> root_;
+    QSet<uint64_t> highlightedPids_;
 };
 
 } // namespace gui

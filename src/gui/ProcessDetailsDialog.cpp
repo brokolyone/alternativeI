@@ -1,7 +1,9 @@
 #include "ProcessDetailsDialog.h"
 
 #include <QHeaderView>
+#include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QSortFilterProxyModel>
 #include <QTabWidget>
 #include <QTableView>
 #include <QVBoxLayout>
@@ -13,16 +15,36 @@ namespace gui {
 
 namespace {
 
-QTableView *makeTableView(QAbstractItemModel *model, QWidget *parent) {
-    auto *view = new QTableView(parent);
-    view->setModel(model);
+// Table + a filter box above it (recursive-substring match across every
+// column, same QSortFilterProxyModel pattern the Processes/Services lists
+// use) so a long Handles/Modules/Network list can be searched instead of
+// only sorted.
+QWidget *makeFilterableTableView(QAbstractItemModel *model, QWidget *parent) {
+    auto *container = new QWidget(parent);
+    auto *layout = new QVBoxLayout(container);
+    layout->setContentsMargins(0, 0, 0, 0);
+
+    auto *filterBox = new QLineEdit(container);
+    filterBox->setPlaceholderText(i18n::t("Filter...", "Фильтр..."));
+    layout->addWidget(filterBox);
+
+    auto *proxy = new QSortFilterProxyModel(container);
+    proxy->setSourceModel(model);
+    proxy->setFilterCaseSensitivity(Qt::CaseInsensitive);
+    proxy->setFilterKeyColumn(-1);
+    QObject::connect(filterBox, &QLineEdit::textChanged, proxy, &QSortFilterProxyModel::setFilterFixedString);
+
+    auto *view = new QTableView(container);
+    view->setModel(proxy);
     view->setSelectionBehavior(QAbstractItemView::SelectRows);
     view->setEditTriggers(QAbstractItemView::NoEditTriggers);
     view->setAlternatingRowColors(true);
     view->setSortingEnabled(true);
     view->horizontalHeader()->setStretchLastSection(true);
     view->verticalHeader()->setVisible(false);
-    return view;
+    layout->addWidget(view);
+
+    return container;
 }
 
 } // namespace
@@ -39,19 +61,19 @@ ProcessDetailsDialog::ProcessDetailsDialog(core::IProcessProvider *provider, uin
     layout->addWidget(tabs);
 
     threadsModel_ = new ThreadsTableModel(this);
-    tabs->addTab(makeTableView(threadsModel_, this), i18n::t("Threads", "Потоки"));
+    tabs->addTab(makeFilterableTableView(threadsModel_, this), i18n::t("Threads", "Потоки"));
 
     modulesModel_ = new ModulesTableModel(this);
-    tabs->addTab(makeTableView(modulesModel_, this), i18n::t("Modules", "Модули"));
+    tabs->addTab(makeFilterableTableView(modulesModel_, this), i18n::t("Modules", "Модули"));
 
     memoryModel_ = new MemoryRegionsTableModel(this);
-    tabs->addTab(makeTableView(memoryModel_, this), i18n::t("Memory", "Память"));
+    tabs->addTab(makeFilterableTableView(memoryModel_, this), i18n::t("Memory", "Память"));
 
     handlesModel_ = new HandlesTableModel(this);
-    tabs->addTab(makeTableView(handlesModel_, this), i18n::t("Handles", "Хендлы"));
+    tabs->addTab(makeFilterableTableView(handlesModel_, this), i18n::t("Handles", "Хендлы"));
 
     networkModel_ = new NetworkTableModel(this);
-    tabs->addTab(makeTableView(networkModel_, this), i18n::t("Network", "Сеть"));
+    tabs->addTab(makeFilterableTableView(networkModel_, this), i18n::t("Network", "Сеть"));
 
     environmentView_ = new QPlainTextEdit(this);
     environmentView_->setReadOnly(true);

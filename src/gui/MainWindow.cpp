@@ -4,6 +4,8 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QDesktopServices>
+#include <QFile>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QHeaderView>
 #include <QItemSelection>
@@ -15,6 +17,7 @@
 #include <QSettings>
 #include <QStatusBar>
 #include <QTabWidget>
+#include <QTextStream>
 #include <QToolBar>
 #include <QTreeView>
 #include <QUrl>
@@ -35,6 +38,29 @@ namespace gui {
 
 namespace {
 constexpr const char *kRefreshIntervalKey = "refreshIntervalMs";
+
+QString priorityToCsvString(core::ProcessPriority priority) {
+    switch (priority) {
+        case core::ProcessPriority::Idle: return QStringLiteral("Idle");
+        case core::ProcessPriority::BelowNormal: return QStringLiteral("BelowNormal");
+        case core::ProcessPriority::Normal: return QStringLiteral("Normal");
+        case core::ProcessPriority::AboveNormal: return QStringLiteral("AboveNormal");
+        case core::ProcessPriority::High: return QStringLiteral("High");
+        case core::ProcessPriority::Realtime: return QStringLiteral("Realtime");
+        default: return QStringLiteral("Unknown");
+    }
+}
+
+// RFC 4180: a field containing a comma, quote or newline must be quoted,
+// with internal quotes doubled.
+QString csvField(const QString &value) {
+    if (!value.contains(',') && !value.contains('"') && !value.contains('\n')) {
+        return value;
+    }
+    QString escaped = value;
+    escaped.replace(QLatin1Char('"'), QStringLiteral("\"\""));
+    return QLatin1Char('"') + escaped + QLatin1Char('"');
+}
 } // namespace
 
 MainWindow::MainWindow(QWidget *parent)
@@ -113,6 +139,9 @@ void MainWindow::buildToolbar() {
     auto *terminateAction = toolbar->addAction(i18n::t("Terminate", "Завершить"));
     connect(terminateAction, &QAction::triggered, this, &MainWindow::terminateSelected);
 
+    auto *exportCsvAction = toolbar->addAction(i18n::t("Export CSV...", "Экспорт CSV..."));
+    connect(exportCsvAction, &QAction::triggered, this, &MainWindow::exportProcessListToCsv);
+
     toolbar->addSeparator();
 
     auto *settingsAction = toolbar->addAction(i18n::t("Settings", "Настройки"));
@@ -138,6 +167,33 @@ void MainWindow::showSettingsDialog() {
     refreshTimer_.setInterval(refreshIntervalMs_);
 }
 
+void MainWindow::exportProcessListToCsv() {
+    const QString path = QFileDialog::getSaveFileName(
+        this, i18n::t("Export process list", "Экспорт списка процессов"), QString(),
+        QStringLiteral("CSV (*.csv)"));
+    if (path.isEmpty()) {
+        return;
+    }
+
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, i18n::t("Export failed", "Ошибка экспорта"),
+                              i18n::t("Could not open the file for writing.",
+                                      "Не удалось открыть файл для записи."));
+        return;
+    }
+
+    QTextStream out(&file);
+    out << "PID,PPID,Name,User,CPU%,MemoryBytes,Threads,Priority,Path\n";
+    for (const core::ProcessInfo *info : model_->allProcesses()) {
+        out << info->pid << ',' << info->ppid << ',' << csvField(QString::fromStdString(info->name))
+            << ',' << csvField(QString::fromStdString(info->user)) << ','
+            << QString::number(info->cpuPercent, 'f', 1) << ',' << info->privateBytes << ','
+            << info->threadCount << ',' << priorityToCsvString(info->priority) << ','
+            << csvField(QString::fromStdString(info->exePath)) << '\n';
+    }
+}
+
 void MainWindow::refresh() {
     // Skip the periodic refresh while Ctrl is held: that's the modifier used
     // to multi-select rows in the tree, and re-sorting/rebuilding the model
@@ -161,6 +217,21 @@ void MainWindow::refresh() {
 
     auto processes = provider_->snapshot();
     const int count = static_cast<int>(processes.size());
+
+    QSet<uint64_t> currentPids;
+    currentPids.reserve(count);
+    for (const auto &proc : processes) {
+        currentPids.insert(proc.pid);
+    }
+    // Skip highlighting on the very first snapshot - every process would
+    // count as "new" against an empty knownPids_, flashing the whole tree.
+    if (autoExpandDone_) {
+        QSet<uint64_t> newPids = currentPids;
+        newPids.subtract(knownPids_);
+        model_->setHighlightedPids(newPids);
+    }
+    knownPids_ = currentPids;
+
     model_->setProcesses(std::move(processes));
     statusLabel_->setText(i18n::t("Processes: %1", "Процессов: %1").arg(count));
 

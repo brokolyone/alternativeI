@@ -1,3 +1,13 @@
+alttools (0.4.1-1) unstable; urgency=low
+
+  * Add a filter box above Threads/Modules/Memory/Handles/Network in the
+    process properties dialog.
+  * Newly-appeared processes flash green in the process tree for one
+    refresh cycle (Process-Hacker-style new-process highlighting).
+  * Add "Export CSV..." to export the current process list.
+
+ -- AlternativeI Project <unset@example.invalid>  Thu, 27 Aug 2026 12:00:00 +0000
+
 alttools (0.3.2-1) unstable; urgency=low
 
   * Add per-process CPU affinity (Set Affinity... dialog, one checkbox
