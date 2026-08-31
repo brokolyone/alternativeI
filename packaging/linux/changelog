@@ -1,3 +1,16 @@
+alttools (1.0.0-1) unstable; urgency=low
+
+  * First feature-complete milestone. Since 0.2.1: process Suspend/Resume
+    and Terminate-tree, CPU affinity, Open File Location/Copy Process
+    Info, per-tab filters and new-process highlighting in the process
+    views, CSV export, a system-wide Network tab, a System info tab, a
+    Startup programs tab, a Command Line column, Light/Dark/System theme,
+    process-list column show/hide, and window geometry persistence -
+    plus portable (ZIP/tar.gz) packages alongside the installer/.deb from
+    0.2.1 onward.
+
+ -- AlternativeI Project <unset@example.invalid>  Mon, 31 Aug 2026 12:00:00 +0000
+
 alttools (0.8.1-1) unstable; urgency=low
 
   * Remember the main window's size and position across restarts.

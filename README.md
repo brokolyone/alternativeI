@@ -1,8 +1,9 @@
-# AlternativeI — Process Hacker analog (Windows + Linux)
+# AltTools — кроссплатформенный аналог Process Hacker (Windows + Linux)
 
-Кроссплатформенный аналог Process Hacker / System Informer: менеджер процессов,
-потоков, хендлов, модулей, сети и служб, плюс отдельная CLI-утилита для
-посекторного backup/restore MBR/GPT/дисков.
+Process Hacker / System Informer сам по себе Windows-only; AltTools — тот же
+класс инструмента (менеджер процессов, потоков, хендлов, модулей, сети и
+служб), но одинаково работающий и на Windows, и на Linux, плюс отдельная
+CLI-утилита для посекторного backup/restore MBR/GPT/дисков.
 
 ## Архитектура
 
@@ -18,37 +19,57 @@
   - `IServiceManager` — список/старт/стоп/рестарт служб. Windows: Service
     Control Manager. Linux: `systemctl`.
 - `src/gui/` — Qt Widgets: дерево процессов (parent-child, как в Process Hacker),
-  диалог свойств процесса (Threads/Modules/Memory/Handles/Network/Environment),
-  вкладки Performance (графики) и Services.
+  диалог свойств процесса (Threads/Modules/Memory/Handles/Network/Environment,
+  с фильтром по каждой вкладке), вкладки Performance (графики), Services,
+  системная Network (все соединения всех процессов), System (сводка по ОС/
+  CPU/памяти/аптайму) и Startup (что запускается при входе в систему).
+  Полная локализация интерфейса EN/RU (`src/gui/i18n.h`), переключаемая из
+  Settings; там же тема (System/Light/Dark, применяется без перезапуска) и
+  интервал обновления списка процессов.
 - `src/diskutil/` — отдельная CLI-утилита без Qt-зависимости для посекторного
   backup/restore MBR/GPT/дисков. См. раздел ниже.
 
 ## Статус
 
-Реализовано и протестировано:
-- [x] Дерево процессов (parent-child), поиск/фильтр (рекурсивный), сортировка
-- [x] Terminate, изменение приоритета
+Реализовано и протестировано (Linux — вручную/скриншотами; Windows — компиляция
+и линковка проверяются на каждый релиз через CI на `windows-latest`/MSVC, но
+без ручной проверки на реальном железе):
+- [x] Дерево процессов (parent-child), поиск/фильтр (рекурсивный), сортировка,
+      настраиваемые колонки (правый клик по заголовку), в т.ч. Command Line
+- [x] Terminate (в т.ч. целого дерева процессов), Suspend/Resume, изменение
+      приоритета и CPU affinity, Open File Location, Copy Process Info,
+      экспорт списка в CSV
+- [x] Подсветка новых процессов; автообновление приостанавливается при
+      зажатом Ctrl, чтобы не терять выделение при мультиселекте
 - [x] Диалог свойств процесса: Threads, Modules, Memory regions, Handles,
-      Environment, Network — на Linux проверено на реальных процессах
-      (тесты, живые TCP-соединения, pipes/eventfd)
+      Environment, Network (у каждой вкладки свой фильтр) — на Linux
+      проверено на реальных процессах (тесты, живые TCP-соединения, pipes/
+      eventfd)
 - [x] Performance-вкладка: графики CPU/память/диск I/O/сеть с автомасштабированием
 - [x] Services-вкладка: список + Start/Stop/Restart
+- [x] Network-вкладка: соединения всех процессов в одной таблице
+- [x] System-вкладка: ОС/ядро/hostname/архитектура/ядра CPU, live CPU/память/
+      аптайм
+- [x] Startup-вкладка: автозагрузка (Linux `~/.config/autostart` +
+      `/etc/xdg/autostart`; Windows `HKCU`/`HKLM` `...\CurrentVersion\Run`),
+      пока только для просмотра
+- [x] О программе / Настройки: EN/RU локализация всего интерфейса, тема
+      System/Light/Dark (без перезапуска), интервал обновления, память
+      размера/позиции окна
 - [x] `diskutil`: info/backup/restore для MBR/GPT/произвольного LBA-диапазона/
       целого диска, с обязательной SHA-256 верификацией — проверено на реальном
       GPT-образе и на loop-устройстве (см. ниже)
-
-Написано, но не собрано/не протестировано (нет Windows-тулчейна в этом окружении):
-- Все Windows-бэкенды (`src/core/windows/*`) — реализованы по документированным
-  и полу-документированным (`NtQuerySystemInformation`/`NtQueryObject`, как в
-  самом Process Hacker) API, но требуют сборки и проверки на реальной Windows.
+- [x] Установщик (NSIS/.deb) и portable-версии (ZIP/tar.gz) для обеих платформ
+      через CPack — см. `docs/packaging.md`
 
 Дальше (по приоритету):
 - [ ] Windows: подписанный kernel-mode драйвер (аналог KPH) для операций,
       недоступных из user-mode — принудительное закрытие защищённых хендлов,
       резолвинг имени хендла без риска зависания (см. `docs/windows-driver.md`)
+- [ ] Startup-вкладка: включение/отключение и удаление записей, не только
+      просмотр
 - [ ] Резервное копирование secondary GPT (в конце диска), сейчас `--region gpt`
       захватывает только primary-копию в начале
-- [ ] Установщик/упаковка (см. `docs/packaging.md`)
 
 ## Сборка GUI-приложения
 
