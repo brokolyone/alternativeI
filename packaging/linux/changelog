@@ -1,3 +1,9 @@
+alttools (0.8.1-1) unstable; urgency=low
+
+  * Remember the main window's size and position across restarts.
+
+ -- AlternativeI Project <unset@example.invalid>  Mon, 31 Aug 2026 12:00:00 +0000
+
 alttools (0.7.1-1) unstable; urgency=low
 
   * Add a "Command Line" column to the process list (hidden by default,

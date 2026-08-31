@@ -3,6 +3,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QCloseEvent>
 #include <QDesktopServices>
 #include <QFile>
 #include <QFileDialog>
@@ -70,15 +71,27 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), provider_(core::createDefaultProcessProvider()) {
     setWindowTitle(i18n::t("AltTools — Process Manager", "AltTools — Диспетчер процессов"));
     resize(1100, 700);
+    // Applied after buildUi() below sets up the tree/tabs, so a restored
+    // geometry isn't immediately overridden by any layout-driven resize.
+    const QByteArray savedGeometry = QSettings().value(QStringLiteral("mainWindowGeometry")).toByteArray();
 
     refreshIntervalMs_ = QSettings().value(QLatin1String(kRefreshIntervalKey), 1000).toInt();
 
     buildUi();
     buildToolbar();
 
+    if (!savedGeometry.isEmpty()) {
+        restoreGeometry(savedGeometry);
+    }
+
     connect(&refreshTimer_, &QTimer::timeout, this, &MainWindow::refresh);
     refreshTimer_.start(refreshIntervalMs_);
     refresh();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+    QSettings().setValue(QStringLiteral("mainWindowGeometry"), saveGeometry());
+    QMainWindow::closeEvent(event);
 }
 
 void MainWindow::buildUi() {

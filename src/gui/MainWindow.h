@@ -12,6 +12,7 @@
 class QLineEdit;
 class QTreeView;
 class QLabel;
+class QCloseEvent;
 
 namespace gui {
 
@@ -20,6 +21,9 @@ class MainWindow : public QMainWindow {
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 private slots:
     void refresh();
