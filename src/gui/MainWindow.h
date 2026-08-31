@@ -39,11 +39,14 @@ private slots:
     void showAboutDialog();
     void showSettingsDialog();
     void exportProcessListToCsv();
+    void showColumnContextMenu(const QPoint &pos);
 
 private:
     void buildUi();
     void buildToolbar();
     void restoreTreeState();
+    void saveColumnVisibility();
+    void restoreColumnVisibility();
 
     std::unique_ptr<core::IProcessProvider> provider_;
     ProcessTreeModel *model_;

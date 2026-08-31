@@ -115,6 +115,11 @@ void MainWindow::buildUi() {
     connect(treeView_, &QTreeView::collapsed, this, &MainWindow::onRowCollapsed);
     connect(treeView_, &QTreeView::doubleClicked, this, &MainWindow::openPropertiesForIndex);
 
+    treeView_->header()->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(treeView_->header(), &QHeaderView::customContextMenuRequested, this,
+            &MainWindow::showColumnContextMenu);
+    restoreColumnVisibility();
+
     layout->addWidget(treeView_);
 
     auto *tabs = new QTabWidget(this);
@@ -260,6 +265,44 @@ void MainWindow::refresh() {
         if (!selection.isEmpty()) {
             treeView_->selectionModel()->select(
                 selection, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+        }
+    }
+}
+
+void MainWindow::showColumnContextMenu(const QPoint &pos) {
+    QMenu menu(this);
+    for (int column = 0; column < ProcessTreeModel::ColumnCount; ++column) {
+        if (column == ProcessTreeModel::ColumnName) {
+            continue; // always visible - it's where the tree structure lives
+        }
+        const QString label = model_->headerData(column, Qt::Horizontal, Qt::DisplayRole).toString();
+        QAction *action = menu.addAction(label);
+        action->setCheckable(true);
+        action->setChecked(!treeView_->isColumnHidden(column));
+        connect(action, &QAction::toggled, this, [this, column](bool visible) {
+            treeView_->setColumnHidden(column, !visible);
+            saveColumnVisibility();
+        });
+    }
+    menu.exec(treeView_->header()->mapToGlobal(pos));
+}
+
+void MainWindow::saveColumnVisibility() {
+    QVariantList hidden;
+    for (int column = 0; column < ProcessTreeModel::ColumnCount; ++column) {
+        if (treeView_->isColumnHidden(column)) {
+            hidden.push_back(column);
+        }
+    }
+    QSettings().setValue(QStringLiteral("hiddenColumns"), hidden);
+}
+
+void MainWindow::restoreColumnVisibility() {
+    const QVariantList hidden = QSettings().value(QStringLiteral("hiddenColumns")).toList();
+    for (const QVariant &value : hidden) {
+        const int column = value.toInt();
+        if (column > ProcessTreeModel::ColumnName && column < ProcessTreeModel::ColumnCount) {
+            treeView_->setColumnHidden(column, true);
         }
     }
 }

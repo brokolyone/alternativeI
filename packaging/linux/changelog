@@ -1,3 +1,11 @@
+alttools (0.5.2-1) unstable; urgency=low
+
+  * Right-click the process list's header to show/hide columns
+    (PPID/CPU/Memory/Threads/User/Priority/Path); the choice persists
+    across restarts.
+
+ -- AlternativeI Project <unset@example.invalid>  Mon, 31 Aug 2026 12:00:00 +0000
+
 alttools (0.5.1-1) unstable; urgency=low
 
   * Add a Light/Dark/System theme setting (Settings dialog), applied
