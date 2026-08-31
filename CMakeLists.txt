@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(AltTools VERSION 0.4.1 LANGUAGES CXX)
+project(AltTools VERSION 0.4.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -101,6 +101,10 @@ set(GUI_SOURCES
     src/gui/RestoreConfirmDialog.cpp
     src/gui/DiskToolsView.h
     src/gui/DiskToolsView.cpp
+    src/gui/NetworkView.h
+    src/gui/NetworkView.cpp
+    src/gui/SystemInfoView.h
+    src/gui/SystemInfoView.cpp
 )
 
 add_executable(alttools

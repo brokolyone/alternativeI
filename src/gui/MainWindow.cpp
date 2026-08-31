@@ -28,10 +28,12 @@
 #include "AboutDialog.h"
 #include "AffinityDialog.h"
 #include "DiskToolsView.h"
+#include "NetworkView.h"
 #include "PerformanceView.h"
 #include "ProcessDetailsDialog.h"
 #include "ServicesView.h"
 #include "SettingsDialog.h"
+#include "SystemInfoView.h"
 #include "i18n.h"
 
 namespace gui {
@@ -119,7 +121,9 @@ void MainWindow::buildUi() {
     tabs->addTab(central, i18n::t("Processes", "Процессы"));
     tabs->addTab(new PerformanceView(tabs), i18n::t("Performance", "Производительность"));
     tabs->addTab(new ServicesView(tabs), i18n::t("Services", "Службы"));
+    tabs->addTab(new NetworkView(tabs), i18n::t("Network", "Сеть"));
     tabs->addTab(new DiskToolsView(tabs), i18n::t("Disk", "Диск"));
+    tabs->addTab(new SystemInfoView(tabs), i18n::t("System", "Система"));
     setCentralWidget(tabs);
 
     statusLabel_ = new QLabel(this);
