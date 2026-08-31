@@ -33,6 +33,7 @@
 #include "ProcessDetailsDialog.h"
 #include "ServicesView.h"
 #include "SettingsDialog.h"
+#include "StartupProgramsView.h"
 #include "SystemInfoView.h"
 #include "i18n.h"
 
@@ -128,6 +129,7 @@ void MainWindow::buildUi() {
     tabs->addTab(new ServicesView(tabs), i18n::t("Services", "Службы"));
     tabs->addTab(new NetworkView(tabs), i18n::t("Network", "Сеть"));
     tabs->addTab(new DiskToolsView(tabs), i18n::t("Disk", "Диск"));
+    tabs->addTab(new StartupProgramsView(tabs), i18n::t("Startup", "Автозагрузка"));
     tabs->addTab(new SystemInfoView(tabs), i18n::t("System", "Система"));
     setCentralWidget(tabs);
 

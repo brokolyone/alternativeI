@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(AltTools VERSION 0.5.2 LANGUAGES CXX)
+project(AltTools VERSION 0.6.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -107,6 +107,10 @@ set(GUI_SOURCES
     src/gui/NetworkView.cpp
     src/gui/SystemInfoView.h
     src/gui/SystemInfoView.cpp
+    src/gui/StartupPrograms.h
+    src/gui/StartupPrograms.cpp
+    src/gui/StartupProgramsView.h
+    src/gui/StartupProgramsView.cpp
 )
 
 add_executable(alttools

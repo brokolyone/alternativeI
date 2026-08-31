@@ -1,3 +1,11 @@
+alttools (0.6.1-1) unstable; urgency=low
+
+  * Add a "Startup" tab: read-only list of what runs at login (Linux
+    ~/.config/autostart + /etc/xdg/autostart *.desktop files; Windows
+    HKCU/HKLM ...\CurrentVersion\Run registry keys).
+
+ -- AlternativeI Project <unset@example.invalid>  Mon, 31 Aug 2026 12:00:00 +0000
+
 alttools (0.5.2-1) unstable; urgency=low
 
   * Right-click the process list's header to show/hide columns
