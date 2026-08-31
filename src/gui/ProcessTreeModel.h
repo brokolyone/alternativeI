@@ -27,6 +27,7 @@ public:
         ColumnUser,
         ColumnPriority,
         ColumnPath,
+        ColumnCommandLine,
         ColumnCount,
     };
 

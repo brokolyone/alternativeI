@@ -195,13 +195,14 @@ void MainWindow::exportProcessListToCsv() {
     }
 
     QTextStream out(&file);
-    out << "PID,PPID,Name,User,CPU%,MemoryBytes,Threads,Priority,Path\n";
+    out << "PID,PPID,Name,User,CPU%,MemoryBytes,Threads,Priority,Path,CommandLine\n";
     for (const core::ProcessInfo *info : model_->allProcesses()) {
         out << info->pid << ',' << info->ppid << ',' << csvField(QString::fromStdString(info->name))
             << ',' << csvField(QString::fromStdString(info->user)) << ','
             << QString::number(info->cpuPercent, 'f', 1) << ',' << info->privateBytes << ','
             << info->threadCount << ',' << priorityToCsvString(info->priority) << ','
-            << csvField(QString::fromStdString(info->exePath)) << '\n';
+            << csvField(QString::fromStdString(info->exePath)) << ','
+            << csvField(QString::fromStdString(info->commandLine)) << '\n';
     }
 }
 
@@ -300,12 +301,21 @@ void MainWindow::saveColumnVisibility() {
 }
 
 void MainWindow::restoreColumnVisibility() {
-    const QVariantList hidden = QSettings().value(QStringLiteral("hiddenColumns")).toList();
-    for (const QVariant &value : hidden) {
-        const int column = value.toInt();
-        if (column > ProcessTreeModel::ColumnName && column < ProcessTreeModel::ColumnCount) {
-            treeView_->setColumnHidden(column, true);
-        }
+    // Command Line defaults to hidden (long, noisy, rarely needed at a
+    // glance) unless the user has an explicit saved preference - once
+    // they've touched the header menu at all, saveColumnVisibility() has
+    // written the *complete* actual hidden set, so this default only ever
+    // applies on a genuinely first run.
+    static const QVariantList kDefaultHidden = {ProcessTreeModel::ColumnCommandLine};
+    const QVariantList hiddenList =
+        QSettings().value(QStringLiteral("hiddenColumns"), kDefaultHidden).toList();
+
+    QSet<int> hidden;
+    for (const QVariant &value : hiddenList) {
+        hidden.insert(value.toInt());
+    }
+    for (int column = ProcessTreeModel::ColumnName + 1; column < ProcessTreeModel::ColumnCount; ++column) {
+        treeView_->setColumnHidden(column, hidden.contains(column));
     }
 }
 

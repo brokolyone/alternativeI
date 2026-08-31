@@ -20,6 +20,7 @@ struct ProcessInfo {
     uint64_t ppid = 0;
     std::string name;
     std::string exePath;
+    std::string commandLine;
     std::string user;
     uint64_t privateBytes = 0;   // working set / RSS in bytes
     uint64_t threadCount = 0;

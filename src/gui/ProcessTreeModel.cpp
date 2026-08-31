@@ -249,6 +249,7 @@ QVariant ProcessTreeModel::data(const QModelIndex &index, int role) const {
         case ColumnUser: return QString::fromStdString(proc->user);
         case ColumnPriority: return priorityToString(proc->priority);
         case ColumnPath: return QString::fromStdString(proc->exePath);
+        case ColumnCommandLine: return QString::fromStdString(proc->commandLine);
         default: return {};
     }
 }
@@ -268,6 +269,7 @@ QVariant ProcessTreeModel::headerData(int section, Qt::Orientation orientation, 
         case ColumnUser: return i18n::t("User", "Пользователь");
         case ColumnPriority: return i18n::t("Priority", "Приоритет");
         case ColumnPath: return i18n::t("Path", "Путь");
+        case ColumnCommandLine: return i18n::t("Command Line", "Командная строка");
         default: return {};
     }
 }

@@ -306,6 +306,14 @@ std::vector<ProcessInfo> ProcessProviderWin::snapshot() {
                 CloseHandle(process);
             }
 
+            auto cached = commandLineCache_.find(info.pid);
+            if (cached != commandLineCache_.end()) {
+                info.commandLine = cached->second;
+            } else {
+                info.commandLine = queryCommandLine(info.pid);
+                commandLineCache_.emplace(info.pid, info.commandLine);
+            }
+
             result.push_back(std::move(info));
         } while (Process32NextW(snapshotHandle, &entry));
     }
@@ -581,6 +589,57 @@ std::vector<HandleInfo> ProcessProviderWin::handles(uint64_t pid) {
     if (targetProcess != nullptr) {
         CloseHandle(targetProcess);
     }
+    return result;
+}
+
+std::string ProcessProviderWin::queryCommandLine(uint64_t pid) {
+    HANDLE process =
+        OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, static_cast<DWORD>(pid));
+    if (process == nullptr) {
+        return {};
+    }
+
+    auto ntQueryInformationProcess = reinterpret_cast<NTSTATUS(NTAPI *)(HANDLE, ULONG, PVOID, ULONG, PULONG)>(
+        GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtQueryInformationProcess"));
+    if (ntQueryInformationProcess == nullptr) {
+        CloseHandle(process);
+        return {};
+    }
+
+    PROCESS_BASIC_INFORMATION pbi{};
+    ULONG returned = 0;
+    if (ntQueryInformationProcess(process, 0 /*ProcessBasicInformation*/, &pbi, sizeof(pbi), &returned) != 0) {
+        CloseHandle(process);
+        return {};
+    }
+
+    // Same native-bitness-only PEB layout assumption as environment()
+    // below: RTL_USER_PROCESS_PARAMETERS.CommandLine is a UNICODE_STRING
+    // at ProcessParameters+0x70, immediately before Environment at +0x80.
+    auto *pebProcessParamsPtr = reinterpret_cast<BYTE *>(pbi.PebBaseAddress) + 0x20;
+    PVOID processParameters = nullptr;
+    if (!ReadProcessMemory(process, pebProcessParamsPtr, &processParameters, sizeof(processParameters),
+                            nullptr)) {
+        CloseHandle(process);
+        return {};
+    }
+
+    UNICODE_STRING commandLine{};
+    if (!ReadProcessMemory(process, static_cast<BYTE *>(processParameters) + 0x70, &commandLine,
+                            sizeof(commandLine), nullptr)) {
+        CloseHandle(process);
+        return {};
+    }
+
+    std::string result;
+    if (commandLine.Length > 0 && commandLine.Buffer != nullptr) {
+        std::vector<wchar_t> buffer(commandLine.Length / sizeof(wchar_t));
+        if (ReadProcessMemory(process, commandLine.Buffer, buffer.data(), commandLine.Length, nullptr)) {
+            result = wideToUtf8(std::wstring(buffer.data(), buffer.size()));
+        }
+    }
+
+    CloseHandle(process);
     return result;
 }
 

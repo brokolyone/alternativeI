@@ -44,6 +44,15 @@ private:
 
     double computeCpuPercent(uint64_t pid, uint64_t kernelAndUserTime100ns);
 
+    // Command line doesn't change after a process starts, so it's read via
+    // a PEB walk (see environment()'s comment on the offsets involved) at
+    // most once per pid rather than every snapshot() tick. Entries for
+    // pids that have since exited are never evicted - a small, bounded-by-
+    // total-processes-ever-seen leak accepted for now rather than adding
+    // eviction machinery.
+    std::string queryCommandLine(uint64_t pid);
+    std::unordered_map<uint64_t, std::string> commandLineCache_;
+
     std::unordered_map<uint64_t, CpuSample> previousSamples_;
     std::chrono::steady_clock::time_point lastSnapshotTime_;
     unsigned long processorCount_ = 1;

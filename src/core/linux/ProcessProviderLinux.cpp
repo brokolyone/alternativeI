@@ -346,6 +346,16 @@ std::vector<ProcessInfo> ProcessProviderLinux::snapshot() {
             info.exePath.assign(exeBuffer.data(), static_cast<size_t>(len));
         }
 
+        // /proc/[pid]/cmdline is argv joined by NUL bytes (with a trailing
+        // NUL) rather than a single shell-escaped string; turn the
+        // separators into spaces for display, trimming the trailing one.
+        std::string cmdline = readFile(base + "/cmdline");
+        if (!cmdline.empty() && cmdline.back() == '\0') {
+            cmdline.pop_back();
+        }
+        std::replace(cmdline.begin(), cmdline.end(), '\0', ' ');
+        info.commandLine = std::move(cmdline);
+
         result.push_back(std::move(info));
     }
 

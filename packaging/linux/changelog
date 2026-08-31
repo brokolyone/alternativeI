@@ -1,3 +1,13 @@
+alttools (0.7.1-1) unstable; urgency=low
+
+  * Add a "Command Line" column to the process list (hidden by default,
+    toggle it from the header's right-click menu) and to CSV export -
+    Linux reads /proc/[pid]/cmdline, Windows walks the PEB
+    (RTL_USER_PROCESS_PARAMETERS.CommandLine), cached per pid since it
+    never changes after a process starts.
+
+ -- AlternativeI Project <unset@example.invalid>  Mon, 31 Aug 2026 12:00:00 +0000
+
 alttools (0.6.1-1) unstable; urgency=low
 
   * Add a "Startup" tab: read-only list of what runs at login (Linux
