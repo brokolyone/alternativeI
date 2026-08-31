@@ -1,3 +1,10 @@
+alttools (0.5.1-1) unstable; urgency=low
+
+  * Add a Light/Dark/System theme setting (Settings dialog), applied
+    live without restarting.
+
+ -- AlternativeI Project <unset@example.invalid>  Mon, 31 Aug 2026 12:00:00 +0000
+
 alttools (0.4.2-1) unstable; urgency=low
 
   * Add a system-wide "Network" tab: every process' connections in one

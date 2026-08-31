@@ -10,6 +10,7 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
+#include "Theme.h"
 #include "i18n.h"
 
 namespace gui {
@@ -37,6 +38,14 @@ SettingsDialog::SettingsDialog(int currentRefreshIntervalMs, QWidget *parent) : 
     form->addRow(i18n::t("Process list refresh interval:", "Интервал обновления списка процессов:"),
                  refreshIntervalSpin_);
 
+    themeCombo_ = new QComboBox(this);
+    // Index matches gui::theme::Mode's underlying values (System=0, Light=1, Dark=2).
+    themeCombo_->addItem(i18n::t("System", "Системная"));
+    themeCombo_->addItem(i18n::t("Light", "Светлая"));
+    themeCombo_->addItem(i18n::t("Dark", "Тёмная"));
+    themeCombo_->setCurrentIndex(static_cast<int>(theme::currentMode()));
+    form->addRow(i18n::t("Theme:", "Тема:"), themeCombo_);
+
     auto *hint = new QLabel(
         i18n::t("Changing the language takes effect after restarting AltTools.",
                 "Смена языка вступит в силу после перезапуска AltTools."),
@@ -55,6 +64,12 @@ int SettingsDialog::refreshIntervalMs() const {
 }
 
 void SettingsDialog::accept() {
+    const auto selectedTheme = static_cast<theme::Mode>(themeCombo_->currentIndex());
+    if (selectedTheme != theme::currentMode()) {
+        theme::setMode(selectedTheme);
+        theme::apply();
+    }
+
     const i18n::Language previousLanguage = i18n::currentLanguage();
     const auto selectedLanguage = static_cast<i18n::Language>(languageCombo_->currentIndex());
     i18n::setLanguage(selectedLanguage);

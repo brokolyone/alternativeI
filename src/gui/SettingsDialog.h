@@ -24,6 +24,7 @@ public slots:
 
 private:
     QComboBox *languageCombo_;
+    QComboBox *themeCombo_;
     QSpinBox *refreshIntervalSpin_;
 };
 

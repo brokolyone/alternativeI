@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(AltTools VERSION 0.4.2 LANGUAGES CXX)
+project(AltTools VERSION 0.5.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -77,6 +77,8 @@ set(GUI_SOURCES
     src/gui/SettingsDialog.cpp
     src/gui/AffinityDialog.h
     src/gui/AffinityDialog.cpp
+    src/gui/Theme.h
+    src/gui/Theme.cpp
     src/gui/MainWindow.h
     src/gui/MainWindow.cpp
     src/gui/ProcessTreeModel.h
